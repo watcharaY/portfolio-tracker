@@ -63,6 +63,7 @@ journey
     section เมื่อมีเหตุการณ์
       โอนเงินเข้า/ออก broker → เพิ่มรายการ: 4: Owner
       จ่ายเบี้ยประกัน → เพิ่มงวด: 4: Owner
+      ได้ปันผล / ดอกเบี้ย / เงินคืน → บันทึกใน Dividends: 4: Owner
       สิ้นปี → ดู Salary & Tax และลดหย่อน: 3: Owner
 ```
 
@@ -114,6 +115,10 @@ erDiagram
     users ||--o{ sessions : "login"
     brokers ||--o{ broker_transactions : "deposit / withdraw"
     insurers ||--o{ insurance_payments : "premium"
+    brokers ||--o{ dividend_payments : "dividend"
+    funds ||--o{ dividend_payments : "dividend"
+    savings_accounts ||--o{ dividend_payments : "interest"
+    insurers ||--o{ dividend_payments : "payout"
 
     users {
         BIGINT id PK
@@ -185,11 +190,21 @@ erDiagram
         TEXT item
         BIGINT amount
     }
+    dividend_payments {
+        BIGINT id PK
+        BIGINT broker_id FK "exactly one of 4"
+        BIGINT fund_id FK
+        BIGINT savings_account_id FK
+        BIGINT insurer_id FK
+        DATE paid_on
+        BIGINT gross "สตางค์ > 0"
+        BIGINT withholding_tax "0..gross"
+    }
 ```
 
 - **เงินเป็นสตางค์ (`BIGINT`)** ทุก column เงิน 1 บาท = 100 รวมยอดแล้วไม่มีเศษทศนิยมเพี้ยน API ส่งเป็นตัวเลขสตางค์ FE แปลงเป็นบาทตอนแสดง ดอกเบี้ยเป็น basis points (2.5% = 250)
 - **ไม่เก็บค่าที่คำนวณได้**: deposits, net capital, P/L, มูลค่า PVD, ดอกเบี้ยต่อปี และยอดใน Dashboard คำนวณทุกครั้งที่อ่าน จึงไม่มีทางที่ตัวเลขจะไม่ตรงกัน
-- **ความสัมพันธ์**: มี FK แค่ 3 เส้น (user → session, broker → รายการโอน, บริษัทประกัน → งวดเบี้ย) ทั้งหมด `ON DELETE CASCADE` ลบตัวแม่แล้วรายการลูกหายด้วย UI ถามยืนยันก่อนลบ
+- **ความสัมพันธ์**: user → session, broker → รายการโอน, บริษัทประกัน → งวดเบี้ย และ `dividend_payments` ที่ชี้ไป asset ได้ 1 จาก 4 ตาราง (broker, fund, savings, insurer: CHECK `num_nonnulls(...) = 1`) ทั้งหมด `ON DELETE CASCADE` ลบตัวแม่แล้วรายการลูกหายด้วย UI ถามยืนยันก่อนลบ
 - **ใช้คนเดียว**: ตารางข้อมูลไม่มี `user_id` ส่วน `users` / `sessions` มีไว้สำหรับ login เท่านั้น
 - ทุกตารางมี `created_at` และ `updated_at` และตารางที่มี `note` ไม่ได้แสดงใน diagram เพื่อให้อ่านง่าย schema เต็มอยู่ที่ [`migrations/`](backend/internal/adapter/postgres/migrations/) และคำอธิบายแต่ละตารางกับ mapping จาก Excel อยู่ที่ [02 · Database ER](docs/02-db-er.md)
 

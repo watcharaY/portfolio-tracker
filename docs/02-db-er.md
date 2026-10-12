@@ -23,6 +23,10 @@ erDiagram
     users ||--o{ sessions : has
     brokers ||--o{ broker_transactions : "deposit / withdraw"
     insurers ||--o{ insurance_payments : "premium paid"
+    brokers ||--o{ dividend_payments : "dividend"
+    funds ||--o{ dividend_payments : "dividend"
+    savings_accounts ||--o{ dividend_payments : "interest"
+    insurers ||--o{ dividend_payments : "payout"
 
     users {
         BIGINT id PK
@@ -105,6 +109,17 @@ erDiagram
         INTEGER year
         TEXT item
         BIGINT amount
+    }
+    dividend_payments {
+        BIGINT id PK
+        BIGINT broker_id FK "exactly one of the 4 source ids"
+        BIGINT fund_id FK
+        BIGINT savings_account_id FK
+        BIGINT insurer_id FK
+        DATE paid_on
+        BIGINT gross "satang > 0"
+        BIGINT withholding_tax "0..gross"
+        TEXT note
     }
 ```
 

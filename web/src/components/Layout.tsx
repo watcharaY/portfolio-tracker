@@ -8,6 +8,7 @@ const tabs = [
   { to: '/pvd', label: 'Provident fund' },
   { to: '/savings', label: 'Savings' },
   { to: '/insurance', label: 'Insurance' },
+  { to: '/dividends', label: 'Dividends' },
   { to: '/salary', label: 'Salary & tax' },
 ]
 

@@ -7,6 +7,7 @@ const menu = [
   { link: 'Provident fund', path: '/pvd', heading: 'Provident Fund (PVD)' },
   { link: 'Savings', path: '/savings', heading: 'Savings Accounts' },
   { link: 'Insurance', path: '/insurance', heading: 'Insurance Premiums' },
+  { link: 'Dividends', path: '/dividends', heading: 'Dividend Tracking' },
   { link: 'Salary & tax', path: '/salary', heading: 'Salary & Tax' },
 ]
 
