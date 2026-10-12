@@ -4,9 +4,12 @@ SHELL := bash
 
 -include .env
 export DATABASE_URL ADDR SESSION_TTL COOKIE_SECURE CORS_ORIGIN
-POSTGRES_USER ?= portfolio
-POSTGRES_DB   ?= portfolio
-XLSX          ?= $(HOME)/Desktop/Portfolio-Tracker.xlsx
+POSTGRES_USER     ?= portfolio
+POSTGRES_PASSWORD ?= portfolio
+POSTGRES_DB       ?= portfolio
+POSTGRES_PORT     ?= 5432
+TEST_DB           := $(POSTGRES_DB)_test
+XLSX              ?= $(HOME)/Desktop/Portfolio-Tracker.xlsx
 
 BIN         := backend/portfolio-tracker$(if $(filter Windows_NT,$(OS)),.exe,)
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
@@ -58,8 +61,9 @@ dev-web: ## Run the Vite dev server on :5173 (proxies /api to :8080)
 test: ## Run Go tests (CI adds GOTESTFLAGS=-race)
 	cd backend && go test $(GOTESTFLAGS) ./...
 
-test-integration: db-up ## Run the Postgres adapter tests against DATABASE_URL (TRUNCATES its tables)
-	cd backend && TEST_DATABASE_URL="$(DATABASE_URL)" go test $(GOTESTFLAGS) -count=1 ./internal/adapter/postgres/
+test-integration: db-up ## Run the Postgres adapter tests in a separate $(POSTGRES_DB)_test database
+	docker compose exec -T db sh -c 'createdb -U $(POSTGRES_USER) $(TEST_DB) 2>/dev/null || true'
+	cd backend && TEST_DATABASE_URL="postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(TEST_DB)?sslmode=disable" 		go test $(GOTESTFLAGS) -count=1 ./internal/adapter/postgres/
 
 vet: ## go vet + gofmt check
 	cd backend && go vet ./...
