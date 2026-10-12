@@ -17,39 +17,35 @@ import (
 	"github.com/watcharaY/portfolio-tracker/backend/internal/usecase"
 )
 
-var (
-	setupOnce sync.Once
-	sharedDB  *postgres.DB
-	setupErr  error
-)
+var sharedDB = sync.OnceValues(func() (*postgres.DB, error) {
+	ctx := context.Background()
+	db, err := postgres.Connect(ctx, os.Getenv("TEST_DATABASE_URL"))
+	if err != nil {
+		return nil, err
+	}
+	return db, postgres.Migrate(ctx, db)
+})
 
 // openDB returns a migrated database with every table emptied and identities reset,
 // so ids in each test start at 1.
 func openDB(t *testing.T) *postgres.DB {
 	t.Helper()
-	url := os.Getenv("TEST_DATABASE_URL")
-	if url == "" {
+	if os.Getenv("TEST_DATABASE_URL") == "" {
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
-	ctx := context.Background()
-	setupOnce.Do(func() {
-		sharedDB, setupErr = postgres.Connect(ctx, url)
-		if setupErr == nil {
-			setupErr = postgres.Migrate(ctx, sharedDB)
-		}
-	})
-	if setupErr != nil {
-		t.Fatalf("setup: %v", setupErr)
+	db, err := sharedDB()
+	if err != nil {
+		t.Fatalf("setup: %v", err)
 	}
 	exec(t, `TRUNCATE users, sessions, brokers, broker_transactions, funds, pvd_years, savings_accounts,
 	         insurers, insurance_payments, salary_months, tax_deductions RESTART IDENTITY CASCADE`)
-	return sharedDB
+	return db
 }
 
 // exec runs raw SQL on its own connection, independent of the adapter under test.
 func exec(t *testing.T, sql string, args ...any) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	conn, err := pgx.Connect(ctx, os.Getenv("TEST_DATABASE_URL"))
 	if err != nil {
 		t.Fatalf("connect: %v", err)
@@ -62,7 +58,7 @@ func exec(t *testing.T, sql string, args ...any) {
 
 func scalar[T any](t *testing.T, sql string, args ...any) T {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	conn, err := pgx.Connect(ctx, os.Getenv("TEST_DATABASE_URL"))
 	if err != nil {
 		t.Fatalf("connect: %v", err)
@@ -102,8 +98,8 @@ func wantErr(t *testing.T, got, want error) {
 
 func wantValidation(t *testing.T, err error, field string) {
 	t.Helper()
-	var ve *domain.ValidationError
-	if !errors.As(err, &ve) {
+	ve, ok := errors.AsType[*domain.ValidationError](err)
+	if !ok {
 		t.Fatalf("error = %v (%T), want *domain.ValidationError", err, err)
 	}
 	if ve.Field != field {
@@ -141,11 +137,8 @@ func wantTimestamps(t *testing.T, beforeCreated, beforeUpdated, afterCreated, af
 }
 
 func date(y int, m time.Month, d int) *time.Time {
-	v := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
-	return &v
+	return new(time.Date(y, m, d, 0, 0, 0, 0, time.UTC))
 }
-
-func ptr[T any](v T) *T { return &v }
 
 func fmtDate(d *time.Time) string {
 	if d == nil {
@@ -489,8 +482,8 @@ func TestInsurerRepo(t *testing.T) {
 
 	muang := must(insurers.Create(ctx, &domain.Insurer{Company: "Muang Thai", Note: "life"}))(t)
 	must(insurers.Create(ctx, &domain.Insurer{Company: "AIA"}))(t)
-	must(payments.Create(ctx, &domain.InsurancePayment{InsurerID: muang, Year: ptr(2024), Premium: 1_000}))(t)
-	must(payments.Create(ctx, &domain.InsurancePayment{InsurerID: muang, Year: ptr(2025), Premium: 1_500}))(t)
+	must(payments.Create(ctx, &domain.InsurancePayment{InsurerID: muang, Year: new(2024), Premium: 1_000}))(t)
+	must(payments.Create(ctx, &domain.InsurancePayment{InsurerID: muang, Year: new(2025), Premium: 1_500}))(t)
 
 	fmtInsurer := func(i domain.InsurerSummary) string {
 		return fmt.Sprintf("%d %s %q payments=%d total=%d", i.ID, i.Company, i.Note, i.Payments, i.TotalPaid)
@@ -524,12 +517,12 @@ func TestInsurancePaymentRepo(t *testing.T) {
 	zurich := must(insurers.Create(ctx, &domain.Insurer{Company: "Zurich"}))(t)
 	aia := must(insurers.Create(ctx, &domain.Insurer{Company: "AIA"}))(t)
 	for _, p := range []domain.InsurancePayment{
-		{InsurerID: zurich, Year: ptr(2025), Premium: 100},            // 1
-		{InsurerID: aia, Year: ptr(2024), Premium: 200},               // 2
+		{InsurerID: zurich, Year: new(2025), Premium: 100},            // 1
+		{InsurerID: aia, Year: new(2024), Premium: 200},               // 2
 		{InsurerID: zurich, Year: nil, Premium: 300, Note: "undated"}, // 3
-		{InsurerID: zurich, Year: ptr(2024), Premium: 400},            // 4
-		{InsurerID: aia, Year: ptr(2024), Premium: 500},               // 5
-		{InsurerID: zurich, Year: ptr(2025), Premium: 600},            // 6
+		{InsurerID: zurich, Year: new(2024), Premium: 400},            // 4
+		{InsurerID: aia, Year: new(2024), Premium: 500},               // 5
+		{InsurerID: zurich, Year: new(2025), Premium: 600},            // 6
 	} {
 		must(payments.Create(ctx, &p))(t)
 	}
@@ -556,11 +549,11 @@ func TestInsurancePaymentRepo(t *testing.T) {
 	})
 
 	t.Run("filter by year keeps the unfiltered numbers", func(t *testing.T) {
-		wantRows(t, rows(must(payments.List(ctx, domain.InsurancePaymentFilter{Year: ptr(2025)}))(t), fmtPayment), []string{
+		wantRows(t, rows(must(payments.List(ctx, domain.InsurancePaymentFilter{Year: new(2025)}))(t), fmtPayment), []string{
 			`Zurich #3 id=1 ins=1 year=2025 100 ""`,
 			`Zurich #4 id=6 ins=1 year=2025 600 ""`,
 		})
-		wantRows(t, rows(must(payments.List(ctx, domain.InsurancePaymentFilter{InsurerID: &zurich, Year: ptr(2024)}))(t), fmtPayment), []string{
+		wantRows(t, rows(must(payments.List(ctx, domain.InsurancePaymentFilter{InsurerID: &zurich, Year: new(2024)}))(t), fmtPayment), []string{
 			`Zurich #2 id=4 ins=1 year=2024 400 ""`,
 		})
 	})
@@ -577,7 +570,7 @@ func TestInsurancePaymentRepo(t *testing.T) {
 		wantTimestamps(t, before.CreatedAt, before.UpdatedAt, after.CreatedAt, after.UpdatedAt)
 		wantRows(t, []string{fmtPayment(must(payments.Get(ctx, 3))(t))}, []string{`Zurich #2 id=3 ins=1 year=nil 300 "undated"`})
 
-		noErr(t, payments.Update(ctx, 1, &domain.InsurancePayment{InsurerID: aia, Year: ptr(2026), Premium: 150}))
+		noErr(t, payments.Update(ctx, 1, &domain.InsurancePayment{InsurerID: aia, Year: new(2026), Premium: 150}))
 		wantRows(t, []string{fmtPayment(must(payments.Get(ctx, 1))(t))}, []string{`AIA #3 id=1 ins=2 year=2026 150 ""`})
 	})
 
@@ -621,7 +614,7 @@ func TestSalaryRepo(t *testing.T) {
 		`3 2025-01 150 0 0 0 0`,
 		`1 2025-02 200 20 2 3 4`,
 	})
-	wantRows(t, rows(must(salary.List(ctx, domain.YearFilter{Year: ptr(2025)}))(t), fmtSalary), []string{
+	wantRows(t, rows(must(salary.List(ctx, domain.YearFilter{Year: new(2025)}))(t), fmtSalary), []string{
 		`3 2025-01 150 0 0 0 0`,
 		`1 2025-02 200 20 2 3 4`,
 	})
@@ -638,7 +631,7 @@ func TestSalaryRepo(t *testing.T) {
 	wantValidation(t, err, "salary_months_month_check")
 
 	noErr(t, salary.Delete(ctx, 3))
-	wantRows(t, rows(must(salary.List(ctx, domain.YearFilter{Year: ptr(2025)}))(t), fmtSalary), []string{`1 2025-02 200 20 2 3 4`})
+	wantRows(t, rows(must(salary.List(ctx, domain.YearFilter{Year: new(2025)}))(t), fmtSalary), []string{`1 2025-02 200 20 2 3 4`})
 }
 
 func TestTaxDeductionRepo(t *testing.T) {
@@ -661,7 +654,7 @@ func TestTaxDeductionRepo(t *testing.T) {
 		`1 2025 RMF 300`,
 		`3 2025 Life insurance 200`,
 	})
-	wantRows(t, rows(must(deductions.List(ctx, domain.YearFilter{Year: ptr(2025)}))(t), fmtDeduction), []string{
+	wantRows(t, rows(must(deductions.List(ctx, domain.YearFilter{Year: new(2025)}))(t), fmtDeduction), []string{
 		`1 2025 RMF 300`,
 		`3 2025 Life insurance 200`,
 	})

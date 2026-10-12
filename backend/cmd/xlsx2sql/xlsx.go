@@ -58,8 +58,8 @@ func openWorkbook(r io.ReaderAt, size int64) (*workbook, error) {
 	}
 	targets := map[string]string{}
 	for _, r := range rels.Rels {
-		if strings.HasPrefix(r.Target, "/") {
-			targets[r.ID] = strings.TrimPrefix(r.Target, "/")
+		if after, ok := strings.CutPrefix(r.Target, "/"); ok {
+			targets[r.ID] = after
 		} else {
 			targets[r.ID] = path.Join("xl", r.Target)
 		}

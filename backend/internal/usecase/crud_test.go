@@ -50,10 +50,10 @@ func (m *memFunds) Delete(_ context.Context, id int64) error { delete(m.rows, id
 func TestCRUD_ValidatesBeforePersisting(t *testing.T) {
 	repo := &memFunds{rows: map[int64]domain.Fund{}}
 	svc := usecase.NewCRUD[*domain.Fund, domain.Fund, domain.NoFilter](repo)
-	ctx := context.Background()
+	ctx := t.Context()
 
-	var ve *domain.ValidationError
-	if _, err := svc.Create(ctx, &domain.Fund{Name: "X", Category: "Crypto"}); !errors.As(err, &ve) {
+	_, err := svc.Create(ctx, &domain.Fund{Name: "X", Category: "Crypto"})
+	if _, ok := errors.AsType[*domain.ValidationError](err); !ok {
 		t.Fatalf("want ValidationError, got %v", err)
 	}
 	if repo.writes != 0 {

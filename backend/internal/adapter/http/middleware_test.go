@@ -160,7 +160,7 @@ func TestRateLimit(t *testing.T) {
 			t.Fatalf("request %d = %d %s (Retry-After %q), want 429 JSON with Retry-After", i, resp.StatusCode, body, resp.Header.Get("Retry-After"))
 		}
 	}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if resp := send(t, app, httptest.NewRequest("GET", "/api/health", nil)); resp.StatusCode != 200 {
 			t.Fatalf("health check %d = %d, want 200: health checks are not rate limited", i, resp.StatusCode)
 		}

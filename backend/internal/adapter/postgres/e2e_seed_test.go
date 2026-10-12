@@ -1,7 +1,6 @@
 package postgres_test
 
 import (
-	"context"
 	"encoding/json"
 	"math"
 	"os"
@@ -64,7 +63,7 @@ func TestE2ESeed_DashboardMatchesExpected(t *testing.T) {
 		postgres.NewBrokerRepo(db), postgres.NewFundRepo(db), postgres.NewPVDRepo(db),
 		postgres.NewSavingsRepo(db), postgres.NewInsurerRepo(db),
 	)
-	got, err := svc.Summary(context.Background())
+	got, err := svc.Summary(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +108,7 @@ func TestE2ESeed_UsersLogInWithDocumentedPasswords(t *testing.T) {
 		{want.Users.ForcedChange, true},
 		{want.Users.Ready, false},
 	} {
-		u, err := users.GetByUsername(context.Background(), c.user.Username)
+		u, err := users.GetByUsername(t.Context(), c.user.Username)
 		if err != nil {
 			t.Fatalf("%s: %v", c.user.Username, err)
 		}
