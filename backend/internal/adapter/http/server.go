@@ -19,7 +19,8 @@ import (
 type Config struct {
 	CookieSecure bool
 	CORSOrigin   string
-	WebUI        fs.FS
+	// WebUI is the built SPA to serve next to the API. Nil serves the API only.
+	WebUI fs.FS
 }
 
 type Services struct {
@@ -88,7 +89,9 @@ func NewServer(cfg Config, s Services) *fiber.App {
 	mount(priv, "/tax-deductions", deductionResource(s.TaxDeductions))
 	api.Use(func(fiber.Ctx) error { return fiber.ErrNotFound })
 
-	mountSPA(app, cfg.WebUI)
+	if cfg.WebUI != nil {
+		mountSPA(app, cfg.WebUI)
+	}
 	return app
 }
 
@@ -105,15 +108,22 @@ func requireJSONBody(c fiber.Ctx) error {
 	return c.Next()
 }
 
+// mountSPA serves the built SPA and falls back to index.html for client routes.
+// index.html is no-cache so a deploy is picked up at once; the hashed assets are not.
 func mountSPA(app *fiber.App, webUI fs.FS) {
-	index, err := fs.ReadFile(webUI, "index.html")
-	if err != nil {
-		index = []byte(`<h1>Frontend not built</h1><p>Run <code>npm run build</code> in <code>web/</code>, or use the Vite dev server on :5173.</p>`)
-	}
-	app.Use("/", static.New("", static.Config{FS: webUI}))
+	app.Use("/", static.New("", static.Config{
+		FS: webUI,
+		ModifyResponse: func(c fiber.Ctx) error {
+			if strings.HasPrefix(string(c.Response().Header.ContentType()), fiber.MIMETextHTML) {
+				c.Set(fiber.HeaderCacheControl, "no-cache")
+			}
+			return nil
+		},
+	}))
 	app.Get("/*", func(c fiber.Ctx) error {
-		if strings.HasPrefix(c.Path(), "/api/") {
-			return fiber.ErrNotFound
+		index, err := fs.ReadFile(webUI, "index.html")
+		if err != nil {
+			return err
 		}
 		c.Set(fiber.HeaderCacheControl, "no-cache")
 		return c.Type("html").Send(index)

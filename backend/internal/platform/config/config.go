@@ -11,6 +11,7 @@ type Config struct {
 	CookieSecure bool
 	SessionTTL   time.Duration
 	CORSOrigin   string
+	WebDir       string
 }
 
 func Load() Config {
@@ -24,6 +25,7 @@ func Load() Config {
 		CookieSecure: env("COOKIE_SECURE", "false") == "true",
 		SessionTTL:   ttl,
 		CORSOrigin:   os.Getenv("CORS_ORIGIN"),
+		WebDir:       os.Getenv("WEB_DIR"),
 	}
 }
 
