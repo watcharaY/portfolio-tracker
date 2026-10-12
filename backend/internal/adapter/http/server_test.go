@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -72,8 +73,8 @@ func TestServer_WithWebUI(t *testing.T) {
 		{"/brokerage", index},
 		{"/index.html", index},
 		{"/assets/app.js", response{200, "text/javascript; charset=utf-8", "", "console.log(1)"}},
-		{"/api/health", response{200, "application/json; charset=utf-8", "", `{"ok":true}`}},
-		{"/api/x", response{404, "application/json; charset=utf-8", "", `{"error":"Not Found"}`}},
+		{"/api/health", response{200, "application/json; charset=utf-8", "no-store", `{"ok":true}`}},
+		{"/api/x", response{404, "application/json; charset=utf-8", "no-store", `{"error":"Not Found"}`}},
 	}
 	for _, c := range cases {
 		if got := get(t, webUI, c.path); got != c.want {
@@ -83,8 +84,11 @@ func TestServer_WithWebUI(t *testing.T) {
 }
 
 func TestServer_APIOnlyWithoutWebUI(t *testing.T) {
-	want := response{404, "application/json; charset=utf-8", "", `{"error":"Not Found"}`}
 	for _, path := range []string{"/", "/brokerage", "/index.html", "/api/x"} {
+		want := response{404, "application/json; charset=utf-8", "", `{"error":"Not Found"}`}
+		if strings.HasPrefix(path, "/api/") {
+			want.cacheControl = "no-store"
+		}
 		if got := get(t, nil, path); got != want {
 			t.Errorf("GET %s = %+v, want %+v", path, got, want)
 		}

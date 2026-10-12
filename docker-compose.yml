@@ -26,6 +26,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD:-portfolio}@db:5432/${POSTGRES_DB:-portfolio}?sslmode=disable
       TZ: Asia/Bangkok
+      TRUSTED_PROXIES: private
     depends_on:
       db:
         condition: service_healthy

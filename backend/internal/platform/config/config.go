@@ -2,6 +2,8 @@ package config
 
 import (
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -12,6 +14,11 @@ type Config struct {
 	SessionTTL   time.Duration
 	CORSOrigin   string
 	WebDir       string
+	// TrustedProxies is TRUSTED_PROXIES split on commas.
+	TrustedProxies     []string
+	RateLimitPerMinute int
+	// LogFormat is "json" (default) or "text".
+	LogFormat string
 }
 
 func Load() Config {
@@ -26,7 +33,28 @@ func Load() Config {
 		SessionTTL:   ttl,
 		CORSOrigin:   os.Getenv("CORS_ORIGIN"),
 		WebDir:       os.Getenv("WEB_DIR"),
+
+		TrustedProxies:     splitList(os.Getenv("TRUSTED_PROXIES")),
+		RateLimitPerMinute: envInt("RATE_LIMIT_PER_MINUTE", 300),
+		LogFormat:          env("LOG_FORMAT", "json"),
 	}
+}
+
+func splitList(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func envInt(key string, def int) int {
+	if n, err := strconv.Atoi(os.Getenv(key)); err == nil && n > 0 {
+		return n
+	}
+	return def
 }
 
 func env(key, def string) string {

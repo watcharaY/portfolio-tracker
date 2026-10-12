@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
 
 	"github.com/watcharaY/portfolio-tracker/backend/internal/domain"
 )
@@ -38,7 +39,7 @@ func errorHandler(c fiber.Ctx, err error) error {
 		status = fiber.StatusForbidden
 	}
 	if status == fiber.StatusInternalServerError {
-		slog.ErrorContext(c.Context(), "request failed", "method", c.Method(), "path", c.Path(), "err", err)
+		slog.ErrorContext(c.Context(), "request failed", "request_id", requestid.FromContext(c), "method", c.Method(), "path", c.Path(), "err", err)
 		return c.Status(status).JSON(errorBody{Error: "internal server error"})
 	}
 	return c.Status(status).JSON(errorBody{Error: err.Error()})

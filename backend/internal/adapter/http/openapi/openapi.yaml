@@ -11,6 +11,12 @@ info:
     authenticates every other call. Until the seeded admin changes its password,
     data endpoints answer 403 `PASSWORD_CHANGE_REQUIRED`. `POST` and `PUT` bodies
     must be sent as `application/json`.
+
+    Every response carries `X-Request-ID` (echoed from the request when it is
+    printable ASCII, otherwise generated) and `Cache-Control: no-store`. Every
+    route except `/health` and `/ready` is limited per client IP (default 300 per
+    minute; login and password change 10 per minute); over the limit the API
+    answers 429 with `Retry-After` and `X-RateLimit-*` headers.
 servers:
   - url: /api
 security:
