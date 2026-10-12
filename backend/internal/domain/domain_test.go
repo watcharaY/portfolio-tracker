@@ -14,19 +14,19 @@ func approx(t *testing.T, got *float64, want float64) {
 	}
 }
 
-func TestBrokerSummary_MatchesSpreadsheet(t *testing.T) {
+func TestBrokerSummary_NetCapitalAndPL(t *testing.T) {
 	b := BrokerSummary{
-		Broker:      Broker{CurrentValue: 63_791_726},
-		Deposits:    2_000 + 5_000_000 + 25_000_000 + 40_000_000 + 7_454_857 + 10_000_000,
-		Withdrawals: 30_002_000,
+		Broker:      Broker{CurrentValue: 120_000_000},
+		Deposits:    100_000_000 + 20_000_000,
+		Withdrawals: 10_000_000,
 	}
-	if got, want := b.NetCapital(), Money(57_454_857); got != want {
+	if got, want := b.NetCapital(), Money(110_000_000); got != want {
 		t.Fatalf("net capital = %d, want %d", got, want)
 	}
-	if got, want := b.UnrealisedPL(), Money(6_336_869); got != want {
+	if got, want := b.UnrealisedPL(), Money(10_000_000); got != want {
 		t.Fatalf("P/L = %d, want %d", got, want)
 	}
-	approx(t, b.PLPercent(), 6_336_869.0/57_454_857.0)
+	approx(t, b.PLPercent(), 10_000_000.0/110_000_000.0)
 }
 
 func TestBrokerSummary_NoCapitalHasNoPercent(t *testing.T) {
@@ -55,11 +55,11 @@ func TestSavingsInterest(t *testing.T) {
 }
 
 func TestPVDYear(t *testing.T) {
-	p := PVDYear{Year: 2025, SelfContribution: 555_000, CompanyContribution: 222_000, SelfProfit: -2_241, CompanyProfit: -896}
-	if p.TotalContribution() != 777_000 || p.TotalProfit() != -3_137 || p.Value() != 773_863 {
+	p := PVDYear{Year: 2026, SelfContribution: 3_600_000, CompanyContribution: 1_800_000, SelfProfit: -120_000, CompanyProfit: -60_000}
+	if p.TotalContribution() != 5_400_000 || p.TotalProfit() != -180_000 || p.Value() != 5_220_000 {
 		t.Fatalf("unexpected totals: %d %d %d", p.TotalContribution(), p.TotalProfit(), p.Value())
 	}
-	approx(t, p.ReturnPercent(), -3_137.0/777_000.0)
+	approx(t, p.ReturnPercent(), -180_000.0/5_400_000.0)
 }
 
 func TestSummarize(t *testing.T) {

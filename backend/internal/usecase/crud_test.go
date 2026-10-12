@@ -60,11 +60,11 @@ func TestCRUD_ValidatesBeforePersisting(t *testing.T) {
 		t.Fatal("invalid entity must not reach the repository")
 	}
 
-	created, err := svc.Create(ctx, &domain.Fund{Name: "Fund B", Category: "Equity", Cost: 10_000, MarketValue: 10_500})
+	created, err := svc.Create(ctx, &domain.Fund{Name: "Fund B", Category: "Equity", Cost: 10_000, MarketValue: 12_000})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if created.ID == 0 || created.UnrealisedPL() != 500 {
+	if created.ID == 0 || created.UnrealisedPL() != 2_000 {
 		t.Fatalf("created = %+v", created)
 	}
 
