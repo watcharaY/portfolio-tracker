@@ -109,7 +109,8 @@ sequenceDiagram
 
 | Method | Path | Auth | หมายเหตุ |
 |---|---|---|---|
-| GET | `/api/health` | – | liveness |
+| GET | `/api/health` | – | liveness (process ตอบได้) |
+| GET | `/api/ready` | – | readiness: ping DB (timeout 2s) ตอบ 503 ถ้าต่อไม่ได้ ใช้เป็น Docker `HEALTHCHECK` ผ่าน `server healthcheck` |
 | POST | `/api/auth/login` | – | rate limited |
 | GET | `/api/auth/me` | session (pending OK) | |
 | POST | `/api/auth/logout` | session (pending OK) | |

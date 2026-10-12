@@ -1,7 +1,9 @@
 package http
 
 import (
+	"context"
 	"io/fs"
+	"log/slog"
 	"path"
 	"strings"
 	"time"
@@ -26,6 +28,8 @@ type Config struct {
 }
 
 type Services struct {
+	// Ready reports whether the API can serve requests, i.e. reach its database.
+	Ready             func(context.Context) error
 	Auth              *usecase.AuthService
 	Dashboard         *usecase.DashboardService
 	Brokers           *usecase.BrokerService
@@ -70,6 +74,7 @@ func NewServer(cfg Config, s Services) *fiber.App {
 
 	api := app.Group("/api")
 	api.Get("/health", func(c fiber.Ctx) error { return c.JSON(fiber.Map{"ok": true}) })
+	api.Get("/ready", readiness(s.Ready))
 	api.Use(requireJSONBody)
 	api.Post("/auth/login", limiter.New(limiter.Config{Max: 10, Expiration: time.Minute}), authH.login)
 
@@ -96,6 +101,20 @@ func NewServer(cfg Config, s Services) *fiber.App {
 		mountSPA(app, cfg.WebUI)
 	}
 	return app
+}
+
+// readiness answers 503 while the database is unreachable, without saying why;
+// the cause goes to the log. /health stays a pure liveness check.
+func readiness(ready func(context.Context) error) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		ctx, cancel := context.WithTimeout(c.Context(), 2*time.Second)
+		defer cancel()
+		if err := ready(ctx); err != nil {
+			slog.WarnContext(c.Context(), "not ready", "err", err)
+			return c.Status(fiber.StatusServiceUnavailable).JSON(errorBody{Error: "database unavailable"})
+		}
+		return c.JSON(fiber.Map{"ok": true})
+	}
 }
 
 // mountDocs serves the OpenAPI document and its Swagger UI. They sit behind the

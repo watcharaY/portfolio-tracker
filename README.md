@@ -40,6 +40,7 @@ flowchart LR
 - **Clean architecture ใน backend**: `domain` ไม่ import ชั้นอื่น, `usecase` คุยกับ DB ผ่าน interface (ports), `adapter/postgres` implement ด้วย SQL ใน `queries/*.sql` ที่ sqlc generate เป็น Go, `app` ประกอบทุกอย่างเข้าด้วยกัน
 - **การคำนวณ**: SQL รวมยอด (เช่น deposits/withdrawals ต่อ broker, ยอดเบี้ยต่อบริษัท, ลำดับงวด `payment_no`) ส่วนสูตรที่เหลือ (net capital, P/L, %, มูลค่า PVD, ดอกเบี้ยต่อปี, Dashboard) อยู่ใน `domain` ที่เดียว
 - **Auth**: session ฝั่ง server, cookie เก็บ token สุ่ม DB เก็บแค่ SHA-256 ของ token, รหัสผ่านเป็น bcrypt ดูรายละเอียดที่ [04 · System design](docs/04-system-design.md)
+- **Health**: `/api/health` = process ยังตอบได้, `/api/ready` = ต่อ DB ได้ (503 ถ้าไม่ได้) image `api` มี Docker `HEALTHCHECK` เรียก `server healthcheck` ดูสถานะได้จาก `docker ps`
 - **API docs**: OpenAPI อยู่ที่ [`openapi.yaml`](backend/internal/adapter/http/openapi/openapi.yaml) เปิด Swagger UI ได้ที่ `/api/docs` หลัง login (เช่น http://localhost:5173/api/docs) API test ตรวจทุก request/response กับ spec และเช็คว่าทุก route มีใน spec จึงไม่มีทางที่ docs จะไม่ตรงกับ code
 - **Dev**: `make dev-web` (Vite :5173) proxy `/api` ไปที่ `make dev-api` (:8080) ส่วน `make app-up` รัน `api` + `web` image เดียวกับ production เบื้องหลังที่ :8000
 
