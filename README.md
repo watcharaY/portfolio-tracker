@@ -40,6 +40,7 @@ flowchart LR
 - **Clean architecture ใน backend**: `domain` ไม่ import ชั้นอื่น, `usecase` คุยกับ DB ผ่าน interface (ports), `adapter/postgres` implement ด้วย SQL ใน `queries/*.sql` ที่ sqlc generate เป็น Go, `app` ประกอบทุกอย่างเข้าด้วยกัน
 - **การคำนวณ**: SQL รวมยอด (เช่น deposits/withdrawals ต่อ broker, ยอดเบี้ยต่อบริษัท, ลำดับงวด `payment_no`) ส่วนสูตรที่เหลือ (net capital, P/L, %, มูลค่า PVD, ดอกเบี้ยต่อปี, Dashboard) อยู่ใน `domain` ที่เดียว
 - **Auth**: session ฝั่ง server, cookie เก็บ token สุ่ม DB เก็บแค่ SHA-256 ของ token, รหัสผ่านเป็น bcrypt ดูรายละเอียดที่ [04 · System design](docs/04-system-design.md)
+- **API docs**: OpenAPI อยู่ที่ [`openapi.yaml`](backend/internal/adapter/http/openapi/openapi.yaml) เปิด Swagger UI ได้ที่ `/api/docs` หลัง login (เช่น http://localhost:5173/api/docs) API test ตรวจทุก request/response กับ spec และเช็คว่าทุก route มีใน spec จึงไม่มีทางที่ docs จะไม่ตรงกับ code
 - **Dev**: `make dev-web` (Vite :5173) proxy `/api` ไปที่ `make dev-api` (:8080) ส่วน `make app-up` รัน `api` + `web` image เดียวกับ production เบื้องหลังที่ :8000
 
 ### User journey
@@ -264,6 +265,7 @@ make deploy-down                                            # stop (ข้อม
 | `make seed-sql` | สร้าง `private/seed-data.sql` จาก Excel (`XLSX=...` เปลี่ยนไฟล์ได้) |
 | `make db-seed` | `seed-sql` + migrate แล้วโหลดเข้า DB local ตารางต้องว่าง (`make db-reset` ก่อน) |
 | `make e2e-seed` | สร้าง DB `portfolio_e2e` ใหม่ด้วยข้อมูลสมมติจาก `backend/testdata/e2e-seed.sql` login `e2e` / `E2e-Tiger-Mango-42` หรือ `admin` / `admin` (ถูกบังคับเปลี่ยนรหัส) |
+| `make swagger-ui` | ดึง `swagger-ui-dist` (`SWAGGER_UI_VERSION`) มาไว้ใน `backend/internal/adapter/http/openapi/swagger-ui/` สำหรับ `/api/docs` |
 | `make migration name=x` | สร้างไฟล์ migration เปล่า `YYYYMMDDHHMMSS_x.sql` (เวลา UTC) |
 | `make sqlc` / `sqlc-check` | generate Go จาก `queries/*.sql` ด้วย sqlc (ผ่าน Docker) / เช็คว่าไฟล์ที่ commit ตรงกับที่ generate ใหม่ |
 | `make test` / `lint` | Go tests / sqlc-check + go vet + gofmt + tsc |

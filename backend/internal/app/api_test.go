@@ -45,6 +45,7 @@ type apiClient struct {
 
 type apiResponse struct {
 	status int
+	header http.Header
 	body   []byte
 }
 
@@ -87,7 +88,8 @@ func (c *apiClient) do(method, path, contentType string, body []byte) apiRespons
 		}
 	}
 	out, _ := io.ReadAll(resp.Body)
-	return apiResponse{resp.StatusCode, out}
+	checkContract(c.t, method, path, contentType, body, resp.StatusCode, resp.Header, out)
+	return apiResponse{resp.StatusCode, resp.Header, out}
 }
 
 func (c *apiClient) json(method, path string, body any) apiResponse {
