@@ -50,6 +50,13 @@ db-psql: db-up ## Open a psql shell
 seed-sql: ## Generate private/seed-data.sql from $(XLSX) (git-ignored, run once on a fresh DB)
 	cd backend && go run ./cmd/xlsx2sql -in "$(XLSX)" -out ../private/seed-data.sql
 
+.PHONY: migration
+migration: ## Create an empty migration: make migration name=add_fund_tags
+	@[[ "$(name)" =~ ^[a-z0-9_]+$$ ]] || { echo "name must be snake_case, e.g. make migration name=add_fund_tags"; exit 1; }
+	@f=backend/internal/adapter/postgres/migrations/$$(date -u +%Y%m%d%H%M%S)_$(name).sql; \
+		( set -C; printf -- '-- %s\n' "$(name)" > "$$f" ) 2>/dev/null || { echo "$$f exists; wait a second and retry"; exit 1; }; \
+		echo "created $$f"
+
 .PHONY: dev-api dev-web
 dev-api: db-up ## Run the backend on :8080
 	cd backend && go run ./cmd/server
