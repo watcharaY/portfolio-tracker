@@ -1,0 +1,17 @@
+{
+  "dashboard": {
+    "total": { "value": 310020100, "cost": 295100050, "pl": 14920050, "plPct": 0.050559, "allocationPct": 1 },
+    "classes": {
+      "stocks":    { "value": 120000000, "cost": 110000000, "pl": 10000000, "plPct": 0.090909, "allocationPct": 0.387072 },
+      "funds":     { "value": 86650050,  "cost": 82000000,  "pl": 4650050,  "plPct": 0.056708, "allocationPct": 0.279498 },
+      "pvd":       { "value": 14670000,  "cost": 14400000,  "pl": 270000,   "plPct": 0.01875,  "allocationPct": 0.04732 },
+      "savings":   { "value": 80000000,  "cost": 80000000,  "pl": 0,        "plPct": 0,        "allocationPct": 0.258048 },
+      "insurance": { "value": 8700050,   "cost": 8700050,   "pl": 0,        "plPct": 0,        "allocationPct": 0.028063 }
+    },
+    "estSavingsInterestPerYear": 1500000
+  },
+  "users": {
+    "forcedChange": { "username": "admin", "password": "admin" },
+    "ready": { "username": "e2e", "password": "E2e-Tiger-Mango-42" }
+  }
+}

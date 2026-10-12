@@ -9,6 +9,7 @@ POSTGRES_PASSWORD ?= portfolio
 POSTGRES_DB       ?= portfolio
 POSTGRES_PORT     ?= 5432
 TEST_DB           := $(POSTGRES_DB)_test
+E2E_DB            := $(POSTGRES_DB)_e2e
 XLSX              ?= $(HOME)/Desktop/Portfolio-Tracker.xlsx
 PG_DIR            := backend/internal/adapter/postgres
 GEN_DIR           := $(PG_DIR)/internal/gen
@@ -57,6 +58,13 @@ seed-sql: ## Generate private/seed-data.sql from $(XLSX) (git-ignored, run once 
 db-seed: seed-sql db-migrate ## Load $(XLSX) into the local DB (tables must be empty: run db-reset first)
 	$(PSQL) -q < private/seed-data.sql
 	@echo "Seeded $(POSTGRES_DB) from $(XLSX)"
+
+.PHONY: e2e-seed
+e2e-seed: db-up ## Recreate $(POSTGRES_DB)_e2e with made-up data from backend/testdata/e2e-seed.sql
+	docker compose exec -T db sh -c 'dropdb -U $(POSTGRES_USER) --if-exists $(E2E_DB) && createdb -U $(POSTGRES_USER) $(E2E_DB)'
+	cd backend && DATABASE_URL="postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(E2E_DB)?sslmode=disable" go run ./cmd/server migrate
+	docker compose exec -T db psql -v ON_ERROR_STOP=1 -U $(POSTGRES_USER) -d $(E2E_DB) -q < backend/testdata/e2e-seed.sql
+	@echo "Seeded $(E2E_DB): log in as e2e / E2e-Tiger-Mango-42, or admin / admin for the forced password change"
 
 .PHONY: migration
 migration: ## Create an empty migration: make migration name=add_fund_tags
