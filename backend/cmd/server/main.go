@@ -32,8 +32,17 @@ func main() {
 			os.Exit(2)
 		}
 	}
-	if err := run(ctx, config.Load()); err != nil {
+	cfg := config.Load()
+	slog.SetDefault(slog.New(logHandler(cfg.LogFormat)))
+	if err := run(ctx, cfg); err != nil {
 		slog.Error("server stopped", "err", err)
 		os.Exit(1)
 	}
+}
+
+func logHandler(format string) slog.Handler {
+	if format == "text" {
+		return slog.NewTextHandler(os.Stderr, nil)
+	}
+	return slog.NewJSONHandler(os.Stderr, nil)
 }

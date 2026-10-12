@@ -23,6 +23,9 @@ services:
     build: ../backend
     environment:
       DATABASE_URL: postgres://portfolio:portfolio@db:5432/portfolio_e2e?sslmode=disable
+      TRUSTED_PROXIES: private
+      # Every Playwright request comes from one client; keep the cap out of the way.
+      RATE_LIMIT_PER_MINUTE: "100000"
     depends_on:
       db:
         condition: service_healthy

@@ -317,6 +317,9 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f private/seed-data.sql
 | `SESSION_TTL` | `168h` | อายุ session |
 | `COOKIE_SECURE` | `false` | ตั้งเป็น `true` เมื่อ serve ผ่าน HTTPS |
 | `CORS_ORIGIN` | – | ใช้เฉพาะตอน frontend อยู่คนละ origin |
+| `TRUSTED_PROXIES` | – | IP/CIDR คั่นด้วย comma (หรือ `private`, `loopback`) ที่อนุญาตให้ส่ง `X-Forwarded-For` มาเป็น IP ของ client ถ้าว่างจะไม่เชื่อ header นี้เลย compose ทุกชุดตั้งเป็น `private` เพราะมีแค่ Caddy ที่คุยกับ api |
+| `RATE_LIMIT_PER_MINUTE` | `300` | จำนวน request `/api` ต่อนาทีต่อ IP (ไม่นับ `/api/health`, `/api/ready`) |
+| `LOG_FORMAT` | `json` | `json` หรือ `text` (`make` ตั้ง `text` ให้ตอน dev) |
 | `WEB_DIR` | – | ถ้าตั้ง จะ serve SPA ที่ build แล้วจากโฟลเดอร์นี้ด้วย (fallback → `index.html`) ถ้าไม่ตั้ง serve แค่ `/api` |
 
 ลืมรหัสผ่าน: `docker exec -it portfolio-tracker-db psql -U portfolio -c "DELETE FROM users;"` แล้ว restart backend ระบบจะ seed `admin/admin` ให้ใหม่
@@ -365,7 +368,10 @@ docs/                    design docs
 - Password: bcrypt, ยาว 8–72 bytes, ห้ามเป็น `admin` หรือตรงกับ username; บัญชี `admin/admin` ที่ seed ไว้ต้องเปลี่ยนรหัสก่อนถึงจะเรียก API อื่นได้
 - Session: token สุ่ม 256-bit เก็บใน DB เฉพาะ SHA-256; cookie `HttpOnly` + `SameSite=Strict` (+ `Secure` เมื่อ `COOKIE_SECURE=true`); เปลี่ยนรหัสผ่านแล้ว session อื่นถูก revoke หมด
 - CSRF: นอกจาก SameSite=Strict แล้ว `POST`/`PUT` ใต้ `/api` ต้องเป็น `Content-Type: application/json` (ส่งข้าม site ไม่ได้ถ้าไม่ผ่าน CORS preflight)
-- Rate limit 10 ครั้ง/นาที/IP ที่ `/api/auth/login` และ `/api/auth/password` (เก็บใน memory; ถ้าอยู่หลัง reverse proxy ทุก request จะดูเหมือนมาจาก IP เดียว)
+- Rate limit ต่อ IP (in-memory): ทุก `/api` 300 ครั้ง/นาที (`RATE_LIMIT_PER_MINUTE`) และ `/api/auth/login`, `/api/auth/password` 10 ครั้ง/นาที เกินแล้วตอบ `429` พร้อม `Retry-After` และ `X-RateLimit-*`
+- Client IP: เชื่อ `X-Forwarded-For` เฉพาะเมื่อ request มาจาก `TRUSTED_PROXIES` (Caddy) จึงปลอม IP จากภายนอกไม่ได้
+- Log: JSON หนึ่งบรรทัดต่อ request (`request_id`, method, route, status, latency, IP, user agent, user id) ไม่มี body, cookie หรือ query string ทุก response มี `X-Request-ID` (รับจาก upstream ถ้าเป็น ASCII ที่อ่านได้ ไม่งั้นสร้างใหม่)
+- API ส่ง `Cache-Control: no-store` ทุก response
 - Headers: helmet + CSP `default-src 'self'` และ HSTS 180 วันเมื่อ `COOKIE_SECURE=true`
 - SQL ใช้ parameter ทุกที่, request body ถูก decode แบบ strict (ปฏิเสธ field ที่ไม่รู้จัก) จำกัด 1 MB, error 500 ไม่ส่งรายละเอียดภายในออกไป
 - PostgreSQL ใน `docker-compose.yml` bind แค่ `127.0.0.1`

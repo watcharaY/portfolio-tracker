@@ -27,6 +27,8 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      # Only Caddy (web) reaches api, over the private compose network.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-private}
     depends_on:
       db:
         condition: service_healthy

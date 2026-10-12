@@ -11,9 +11,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
-	"github.com/gofiber/fiber/v3/middleware/limiter"
-	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/gofiber/fiber/v3/middleware/static"
 
 	"github.com/watcharaY/portfolio-tracker/backend/internal/adapter/http/openapi"
@@ -25,6 +24,13 @@ type Config struct {
 	CORSOrigin   string
 	// WebUI is the built SPA to serve next to the API. Nil serves the API only.
 	WebUI fs.FS
+	// TrustedProxies may set the client IP through X-Forwarded-For: IPs, CIDRs,
+	// or the keywords "private" and "loopback". Empty trusts no one.
+	TrustedProxies []string
+	// RateLimitPerMinute caps /api requests per client IP. Zero means 300.
+	RateLimitPerMinute int
+	// Logger receives the access log. Nil means slog.Default().
+	Logger *slog.Logger
 }
 
 type Services struct {
@@ -44,15 +50,26 @@ type Services struct {
 }
 
 func NewServer(cfg Config, s Services) *fiber.App {
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
+	}
+	if cfg.RateLimitPerMinute == 0 {
+		cfg.RateLimitPerMinute = 300
+	}
+	trust, trustCfg := trustProxy(cfg.TrustedProxies)
 	app := fiber.New(fiber.Config{
-		AppName:      "Portfolio Tracker",
-		BodyLimit:    1 << 20,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		ErrorHandler: errorHandler,
+		AppName:            "Portfolio Tracker",
+		BodyLimit:          1 << 20,
+		ReadTimeout:        15 * time.Second,
+		WriteTimeout:       15 * time.Second,
+		IdleTimeout:        60 * time.Second,
+		ErrorHandler:       errorHandler,
+		TrustProxy:         trust,
+		TrustProxyConfig:   trustCfg,
+		ProxyHeader:        fiber.HeaderXForwardedFor,
+		EnableIPValidation: true,
 	})
-	app.Use(recover.New(), logger.New(), helmet.New(helmet.Config{
+	app.Use(recover.New(), requestid.New(), accessLog(cfg.Logger), helmet.New(helmet.Config{
 		// The built SPA only loads its own hashed bundles; React's style={} goes through CSSOM, which CSP allows.
 		// Vite inlines small font subsets as data: URIs.
 		ContentSecurityPolicy: "default-src 'self'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
@@ -72,16 +89,16 @@ func NewServer(cfg Config, s Services) *fiber.App {
 	authH := &authHandler{auth: s.Auth, cookies: cookies}
 	requireAuth := requireSession(s.Auth, cookies)
 
-	api := app.Group("/api")
+	api := app.Group("/api", noStore, rateLimit(cfg.RateLimitPerMinute, isHealthCheck))
 	api.Get("/health", func(c fiber.Ctx) error { return c.JSON(fiber.Map{"ok": true}) })
 	api.Get("/ready", readiness(s.Ready))
 	api.Use(requireJSONBody)
-	api.Post("/auth/login", limiter.New(limiter.Config{Max: 10, Expiration: time.Minute}), authH.login)
+	api.Post("/auth/login", rateLimit(10, nil), authH.login)
 
 	pending := api.Group("/auth", requireAuth(true))
 	pending.Get("/me", authH.me)
 	pending.Post("/logout", authH.logout)
-	pending.Post("/password", limiter.New(limiter.Config{Max: 10, Expiration: time.Minute}), authH.changePassword)
+	pending.Post("/password", rateLimit(10, nil), authH.changePassword)
 
 	priv := api.Group("", requireAuth(false))
 	priv.Get("/dashboard", (&dashboardHandler{svc: s.Dashboard}).summary)
@@ -110,7 +127,7 @@ func readiness(ready func(context.Context) error) fiber.Handler {
 		ctx, cancel := context.WithTimeout(c.Context(), 2*time.Second)
 		defer cancel()
 		if err := ready(ctx); err != nil {
-			slog.WarnContext(c.Context(), "not ready", "err", err)
+			slog.WarnContext(c.Context(), "not ready", "request_id", requestid.FromContext(c), "err", err)
 			return c.Status(fiber.StatusServiceUnavailable).JSON(errorBody{Error: "database unavailable"})
 		}
 		return c.JSON(fiber.Map{"ok": true})

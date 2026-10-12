@@ -30,7 +30,12 @@ func Migrate(ctx context.Context, cfg config.Config) error {
 }
 
 func Run(ctx context.Context, cfg config.Config) error {
-	httpCfg := httpadapter.Config{CookieSecure: cfg.CookieSecure, CORSOrigin: cfg.CORSOrigin}
+	httpCfg := httpadapter.Config{
+		CookieSecure:       cfg.CookieSecure,
+		CORSOrigin:         cfg.CORSOrigin,
+		TrustedProxies:     cfg.TrustedProxies,
+		RateLimitPerMinute: cfg.RateLimitPerMinute,
+	}
 	if cfg.WebDir != "" {
 		httpCfg.WebUI = os.DirFS(cfg.WebDir)
 		if _, err := fs.Stat(httpCfg.WebUI, "index.html"); err != nil {
