@@ -54,9 +54,12 @@ dev-api: db-up ## Run the backend on :8080
 dev-web: ## Run the Vite dev server on :5173 (proxies /api to :8080)
 	cd web && npm run dev
 
-.PHONY: test vet typecheck lint vulncheck check
+.PHONY: test test-integration vet typecheck lint vulncheck check
 test: ## Run Go tests (CI adds GOTESTFLAGS=-race)
 	cd backend && go test $(GOTESTFLAGS) ./...
+
+test-integration: db-up ## Run the Postgres adapter tests against DATABASE_URL (TRUNCATES its tables)
+	cd backend && TEST_DATABASE_URL="$(DATABASE_URL)" go test $(GOTESTFLAGS) -count=1 ./internal/adapter/postgres/
 
 vet: ## go vet + gofmt check
 	cd backend && go vet ./...
