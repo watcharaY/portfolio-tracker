@@ -9,11 +9,11 @@ schema อยู่ที่ [`backend/internal/adapter/postgres/migrations/`](.
 |---|---|---|
 | เงิน | `BIGINT` หน่วย **สตางค์** (1 THB = 100) | sum ไม่มี floating error ตรงกับยอดใน Excel ทุกสตางค์ API ส่งเป็นตัวเลขธรรมดา (ไม่ใช่ string แบบ `NUMERIC`) |
 | อัตราดอกเบี้ย | `INTEGER` หน่วย **basis points** (2.5% = 250) | เหตุผลเดียวกัน |
-| วันที่ | `DATE` แต่ view ส่งออกเป็น text `YYYY-MM-DD` | ไม่มีปัญหา timezone ฝั่ง client |
+| วันที่ | `DATE` แต่ API ส่งออกเป็น text `YYYY-MM-DD` | ไม่มีปัญหา timezone ฝั่ง client |
 | Primary key | `BIGINT GENERATED ALWAYS AS IDENTITY` | มาตรฐาน SQL ใช้แทน `SERIAL` |
-| Aggregates | `SUM(...)::BIGINT` ใน view | `SUM(bigint)` ของ Postgres คืนค่าเป็น `NUMERIC` |
+| Aggregates | `SUM(...)::BIGINT` ใน `queries/*.sql` | `SUM(bigint)` ของ Postgres คืนค่าเป็น `NUMERIC` |
 | timestamps | `created_at`, `updated_at` (`TIMESTAMPTZ`) ทุกตาราง | audit แบบง่าย |
-| สูตร Excel | อยู่ใน **view `v_*`** เท่านั้น ไม่เก็บค่าที่คำนวณได้ลงตาราง | เป็น single source of truth ไม่มีทางที่ค่าจะไม่ตรงกัน |
+| สูตร Excel | SQL รวมยอด ส่วนสูตรอยู่ใน `backend/internal/domain` ไม่เก็บค่าที่คำนวณได้ลงตาราง | เป็น single source of truth ไม่มีทางที่ค่าจะไม่ตรงกัน |
 | Single user | ตารางข้อมูลไม่มี `user_id` | ใช้คนเดียว ถ้าจะทำ multi-user ค่อยเพิ่ม `user_id` ผ่าน migration |
 
 ## ER diagram
@@ -111,17 +111,17 @@ erDiagram
 > ทุกตารางข้อมูลมี `created_at` และ `updated_at` (ไม่ได้ใส่ใน diagram เพื่อให้อ่านง่าย)
 > FK ทั้งหมดเป็น `ON DELETE CASCADE` ถ้าลบ broker/insurer รายการลูกจะถูกลบด้วย
 
-## Views (แทนสูตรใน Excel)
+## Computed values (แทนสูตรใน Excel)
 
-| View | คอลัมน์ที่คำนวณ | สูตร Excel เดิม |
+| Resource | คอลัมน์ที่คำนวณ | สูตร Excel เดิม |
 |---|---|---|
-| `v_brokers` | `deposits`, `withdrawals`, `net_capital`, `unrealised_pl` | `SUMIFS(... "Deposit")`, `C-D`, `B-E` |
-| `v_broker_transactions` | `broker_name` | – |
-| `v_funds` | `unrealised_pl` | `D-C` |
-| `v_pvd_years` | `total_contribution`, `total_profit`, `value` | `B+C`, `D+E`, `F+G` |
-| `v_savings_accounts` | `interest_per_year` | `B*C` |
-| `v_insurers` | `payments`, `total_paid` | `COUNTIF`, `SUMIF` |
-| `v_insurance_payments` | `company`, `payment_no` | `COUNTIF($F$6:$F6,$F6)` → `ROW_NUMBER()` |
+| `brokers` (SQL sum + domain) | `deposits`, `withdrawals`, `net_capital`, `unrealised_pl` | `SUMIFS(... "Deposit")`, `C-D`, `B-E` |
+| `broker_transactions` (SQL join) | `broker_name` | – |
+| `funds` (domain) | `unrealised_pl` | `D-C` |
+| `pvd_years` (domain) | `total_contribution`, `total_profit`, `value` | `B+C`, `D+E`, `F+G` |
+| `savings_accounts` (domain) | `interest_per_year` | `B*C` |
+| `insurers` (SQL count/sum) | `payments`, `total_paid` | `COUNTIF`, `SUMIF` |
+| `insurance_payments` (SQL `ROW_NUMBER`) | `company`, `payment_no` | `COUNTIF($F$6:$F6,$F6)` → `ROW_NUMBER()` |
 
 ส่วน % (P/L %, Return %) คำนวณที่ frontend หรือใน `/api/dashboard` เพราะต้องจัดการกรณีหารด้วย 0 (ใน Excel คือ `IF(...=0,"",...)`)
 
@@ -129,9 +129,9 @@ erDiagram
 
 | Asset class | Value | Cost |
 |---|---|---|
-| Stocks | `SUM(brokers.current_value)` | `SUM(v_brokers.net_capital)` |
+| Stocks | `SUM(brokers.current_value)` | `SUM(net_capital)` ของแต่ละ broker |
 | Funds | `SUM(funds.market_value)` | `SUM(funds.cost)` |
-| PVD | `SUM(v_pvd_years.value)` | `SUM(total_contribution)` |
+| PVD | `SUM(value)` ของแต่ละปี | `SUM(total_contribution)` |
 | Savings | `SUM(balance)` | = value |
 | Insurance | `SUM(insurance_payments.premium)` | = value |
 

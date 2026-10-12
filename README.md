@@ -4,11 +4,192 @@ Web app ส่วนตัว (ใช้คนเดียว) สำหรั�
 ครอบคลุม Brokerage, Mutual Funds, Provident Fund, Savings, Insurance และ Salary & Tax พร้อม Dashboard สรุปภาพรวม
 
 - **Backend**: Go 1.26+ · [Fiber v3](https://gofiber.io) · PostgreSQL 18 ([pgx v5](https://github.com/jackc/pgx))
-- **Frontend**: React 19 · Vite 5 · TypeScript · react-router
+- **Frontend**: React 19 · Vite 6 · TypeScript · react-router
 - **Auth**: username/password (bcrypt) + server-side session cookie (HttpOnly, SameSite=Strict)
 - **Deploy**: frontend กับ backend build และ deploy แยกกัน: Caddy serve SPA และ proxy `/api/*` ไปที่ Go API บน origin เดียวกัน
 
 ![dashboard](docs/images/dashboard-light.png)
+
+## ภาพรวมระบบ
+
+### System design
+
+```mermaid
+flowchart LR
+    U([Owner<br/>browser])
+    subgraph web["web · Caddy (web/Dockerfile)"]
+        SPA["static SPA<br/>React 19 + Vite build"]
+        PX["/api/* → reverse_proxy"]
+    end
+    subgraph api["api · Go binary (backend/Dockerfile)"]
+        direction TB
+        HTTP["adapter/http<br/>Fiber v3 · auth guard · DTO · error → status"]
+        UC["usecase<br/>AuthService · CRUD · Dashboard"]
+        DOM["domain<br/>entities · validation · P/L, %, totals"]
+        PG["adapter/postgres<br/>repositories on sqlc · migrations"]
+        HTTP --> UC --> DOM
+        UC --> PG
+    end
+    DB[("PostgreSQL 18")]
+    U -- "HTTPS · cookie pt_session" --> SPA
+    U -- "fetch /api/*" --> PX --> HTTP
+    PG --> DB
+```
+
+- **แยก FE / BE**: `web` (Caddy) serve ไฟล์ SPA และ proxy `/api/*` ไปที่ `api` บน origin เดียวกัน จึงไม่ต้องตั้ง CORS และ cookie `SameSite=Strict` ใช้ได้ตรงๆ ถ้า `api` ล่ม หน้าเว็บยังโหลดได้ มีแค่ `/api` ที่ตอบ 502
+- **Clean architecture ใน backend**: `domain` ไม่ import ชั้นอื่น, `usecase` คุยกับ DB ผ่าน interface (ports), `adapter/postgres` implement ด้วย SQL ใน `queries/*.sql` ที่ sqlc generate เป็น Go, `app` ประกอบทุกอย่างเข้าด้วยกัน
+- **การคำนวณ**: SQL รวมยอด (เช่น deposits/withdrawals ต่อ broker, ยอดเบี้ยต่อบริษัท, ลำดับงวด `payment_no`) ส่วนสูตรที่เหลือ (net capital, P/L, %, มูลค่า PVD, ดอกเบี้ยต่อปี, Dashboard) อยู่ใน `domain` ที่เดียว
+- **Auth**: session ฝั่ง server, cookie เก็บ token สุ่ม DB เก็บแค่ SHA-256 ของ token, รหัสผ่านเป็น bcrypt ดูรายละเอียดที่ [04 · System design](docs/04-system-design.md)
+- **Dev**: `make dev-web` (Vite :5173) proxy `/api` ไปที่ `make dev-api` (:8080) ส่วน `make app-up` รัน `api` + `web` image เดียวกับ production เบื้องหลังที่ :8000
+
+### User journey
+
+ผู้ใช้มีคนเดียวคือเจ้าของพอร์ต งานหลักคือ **อัปเดตตัวเลขเป็นระยะ แล้วเปิดดูภาพรวมแทนการเปิด Excel**
+
+```mermaid
+journey
+    title Owner: จากเปิดใช้ครั้งแรก ถึงใช้งานประจำ
+    section ครั้งแรก
+      Login ด้วย admin/admin: 3: Owner
+      ถูกบังคับเปลี่ยนรหัสผ่าน: 4: Owner
+      Import ข้อมูลจาก Excel (make db-seed): 4: Owner
+    section ทุกเดือน
+      อัปเดต Current Value ของ broker: 4: Owner
+      อัปเดต Market Value ของกองทุน: 4: Owner
+      บันทึกเงินเดือนและ PVD: 4: Owner
+      ดู Dashboard (มูลค่ารวม, P/L, สัดส่วน): 5: Owner
+    section เมื่อมีเหตุการณ์
+      โอนเงินเข้า/ออก broker → เพิ่มรายการ: 4: Owner
+      จ่ายเบี้ยประกัน → เพิ่มงวด: 4: Owner
+      สิ้นปี → ดู Salary & Tax และลดหย่อน: 3: Owner
+```
+
+คะแนน 1–5 คือความลื่นไหลที่คาดไว้
+
+**Login ครั้งแรก**: server สร้าง `admin/admin` ให้เมื่อยังไม่มี user เลย แต่บัญชีนี้ติด `must_change_password` ทุก API ข้อมูลตอบ `403` จนกว่าจะเปลี่ยนรหัสผ่าน
+
+```mermaid
+flowchart TD
+    A([เปิดเว็บ]) --> B{มี session?}
+    B -- ไม่มี / หมดอายุ --> L[/login/]
+    L -- POST /api/auth/login --> C{ถูกต้อง?}
+    C -- 401 --> L
+    C -- ต้องเปลี่ยนรหัส --> CP[/change-password/]
+    B -- มี แต่ต้องเปลี่ยนรหัส --> CP
+    CP -- POST /api/auth/password --> D{ผ่านกฎ?}
+    D -- 400 --> CP
+    D -- 200: revoke session อื่นทั้งหมด --> DASH[/Dashboard/]
+    B -- มี --> DASH
+```
+
+**แก้ข้อมูลรายเดือน**: ทุกตารางใช้ component เดียวกัน (`ResourceTable`) กด Edit แก้ในแถว แล้ว Save ส่ง `PUT` กลับไป ตัวเลขที่คำนวณได้จะมาจาก API เสมอ
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant UI as React SPA
+    participant API as Go API
+    participant DB as PostgreSQL
+    O->>UI: Edit แถว broker → Current Value
+    O->>UI: Save
+    UI->>API: PUT /api/brokers/1 {name, current_value, note}
+    API->>API: domain.Validate()
+    API->>DB: UPDATE brokers … RETURNING id
+    UI->>API: GET /api/brokers
+    API->>DB: SELECT brokers + SUM(deposit/withdraw)
+    API-->>UI: rows + net_capital, unrealised_pl, pl_pct (คำนวณใน domain)
+    O->>UI: เปิด Dashboard
+    UI->>API: GET /api/dashboard
+    API-->>UI: มูลค่า, ต้นทุน, P/L และสัดส่วนของ 5 หมวด
+```
+
+flow อื่นและ edge case อยู่ที่ [03 · User journey](docs/03-user-journey.md)
+
+### ER diagram
+
+```mermaid
+erDiagram
+    users ||--o{ sessions : "login"
+    brokers ||--o{ broker_transactions : "deposit / withdraw"
+    insurers ||--o{ insurance_payments : "premium"
+
+    users {
+        BIGINT id PK
+        TEXT username UK
+        TEXT password_hash "bcrypt"
+        BOOLEAN must_change_password
+    }
+    sessions {
+        TEXT token_hash PK "sha256 ของ cookie"
+        BIGINT user_id FK
+        TIMESTAMPTZ expires_at
+    }
+    brokers {
+        BIGINT id PK
+        TEXT name UK
+        BIGINT current_value "สตางค์"
+    }
+    broker_transactions {
+        BIGINT id PK
+        BIGINT broker_id FK
+        DATE txn_date "nullable"
+        TEXT type "deposit | withdraw"
+        BIGINT amount "สตางค์ > 0"
+    }
+    funds {
+        BIGINT id PK
+        TEXT name UK
+        TEXT category "9 หมวด"
+        BIGINT cost "สตางค์"
+        BIGINT market_value "สตางค์"
+    }
+    pvd_years {
+        BIGINT id PK
+        INTEGER year UK
+        BIGINT self_contribution
+        BIGINT company_contribution
+        BIGINT self_profit
+        BIGINT company_profit
+    }
+    savings_accounts {
+        BIGINT id PK
+        TEXT bank
+        BIGINT balance "สตางค์"
+        INTEGER interest_bp "basis points"
+    }
+    insurers {
+        BIGINT id PK
+        TEXT company UK
+    }
+    insurance_payments {
+        BIGINT id PK
+        BIGINT insurer_id FK
+        INTEGER year "nullable"
+        BIGINT premium "สตางค์ > 0"
+    }
+    salary_months {
+        BIGINT id PK
+        INTEGER year "UK (year, month)"
+        INTEGER month "1-12"
+        BIGINT salary
+        BIGINT bonus
+        BIGINT withholding_tax
+        BIGINT pvd
+        BIGINT sso
+    }
+    tax_deductions {
+        BIGINT id PK
+        INTEGER year
+        TEXT item
+        BIGINT amount
+    }
+```
+
+- **เงินเป็นสตางค์ (`BIGINT`)** ทุก column เงิน 1 บาท = 100 รวมยอดแล้วไม่มีเศษทศนิยมเพี้ยน API ส่งเป็นตัวเลขสตางค์ FE แปลงเป็นบาทตอนแสดง ดอกเบี้ยเป็น basis points (2.5% = 250)
+- **ไม่เก็บค่าที่คำนวณได้**: deposits, net capital, P/L, มูลค่า PVD, ดอกเบี้ยต่อปี และยอดใน Dashboard คำนวณทุกครั้งที่อ่าน จึงไม่มีทางที่ตัวเลขจะไม่ตรงกัน
+- **ความสัมพันธ์**: มี FK แค่ 3 เส้น (user → session, broker → รายการโอน, บริษัทประกัน → งวดเบี้ย) ทั้งหมด `ON DELETE CASCADE` ลบตัวแม่แล้วรายการลูกหายด้วย UI ถามยืนยันก่อนลบ
+- **ใช้คนเดียว**: ตารางข้อมูลไม่มี `user_id` ส่วน `users` / `sessions` มีไว้สำหรับ login เท่านั้น
+- ทุกตารางมี `created_at` และ `updated_at` และตารางที่มี `note` ไม่ได้แสดงใน diagram เพื่อให้อ่านง่าย schema เต็มอยู่ที่ [`migrations/`](backend/internal/adapter/postgres/migrations/) และคำอธิบายแต่ละตารางกับ mapping จาก Excel อยู่ที่ [02 · Database ER](docs/02-db-er.md)
 
 ## Quick start
 
@@ -161,14 +342,14 @@ docs/                    design docs
 | | |
 |---|---|
 | [01 · Design pages](docs/01-design-pages.md) | sitemap, wireframes, screenshots, review checklist |
-| [02 · Database ER](docs/02-db-er.md) | ER diagram, views (แทนสูตร Excel), Excel → table mapping |
+| [02 · Database ER](docs/02-db-er.md) | ER diagram, conventions, Excel → table mapping |
 | [03 · User journey](docs/03-user-journey.md) | first login, monthly update, session expiry |
 | [04 · System design](docs/04-system-design.md) | architecture, auth flow, API, security, deployment, roadmap |
 
 ## Conventions
 
 - เงินเก็บเป็น `BIGINT` และส่งผ่าน API เป็น **integer satang** (`100` = ฿1.00) ส่วนดอกเบี้ยเป็น **basis points** (`250` = 2.5%)
-- ค่าที่คำนวณได้อยู่ใน SQL view `v_*` ไม่เก็บซ้ำลงตาราง
+- ค่าที่คำนวณได้ไม่เก็บลงตาราง: SQL รวมยอดใน `queries/*.sql` ส่วนสูตรอยู่ใน `backend/internal/domain`
 - เปลี่ยน schema ด้วย `make migration name=x` แล้วแก้ไฟล์ใหม่ ห้ามแก้ไฟล์เดิม จากนั้น `make db-migrate` และ `make sqlc`
 - เพิ่มหรือแก้ SQL ใน `backend/internal/adapter/postgres/queries/*.sql` แล้วรัน `make sqlc` และ commit `internal/gen` ไปด้วย
 
