@@ -81,6 +81,17 @@ sqlc-check: ## Fail when the committed sqlc output differs from a fresh generate
 		echo "sqlc output is stale: run 'make sqlc' and commit $(GEN_DIR)"; exit 1; \
 	fi
 
+.PHONY: app-up app-down app-logs
+app-up: ## Build and start db, api and web in the background on http://localhost:$${APP_PORT:-8000}
+	docker compose --profile app up -d --build --wait
+	@echo "App: http://localhost:$${APP_PORT:-8000}"
+
+app-down: ## Stop api and web (the db keeps running; db-down stops it)
+	docker compose --profile app stop api web
+
+app-logs: ## Follow api and web logs
+	docker compose --profile app logs -f api web
+
 .PHONY: dev-api dev-web
 dev-api: db-up ## Run the backend on :8080
 	cd backend && go run ./cmd/server
