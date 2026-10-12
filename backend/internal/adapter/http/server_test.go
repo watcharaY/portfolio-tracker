@@ -1,11 +1,16 @@
 package http
 
 import (
+	"context"
 	"io"
 	"io/fs"
 	"net/http/httptest"
 	"testing"
 	"testing/fstest"
+	"time"
+
+	"github.com/watcharaY/portfolio-tracker/backend/internal/domain"
+	"github.com/watcharaY/portfolio-tracker/backend/internal/usecase"
 )
 
 type response struct {
@@ -15,13 +20,37 @@ type response struct {
 	body         string
 }
 
+// These stubs make every token a valid session, so an unknown /api path
+// reaches the API's own 404 instead of stopping at the auth guard's 401.
+type anyUser struct{ usecase.UserRepository }
+
+func (anyUser) GetByID(context.Context, int64) (domain.User, error) { return domain.User{ID: 1}, nil }
+
+type anySession struct{ usecase.SessionRepository }
+
+func (anySession) GetValid(context.Context, string, time.Time) (domain.Session, error) {
+	return domain.Session{UserID: 1}, nil
+}
+
+type noHasher struct{ usecase.PasswordHasher }
+
+func (noHasher) Hash(string) (string, error) { return "", nil }
+
+type plainTokens struct{ usecase.TokenIssuer }
+
+func (plainTokens) Hash(token string) string { return token }
+
 func get(t *testing.T, webUI fs.FS, path string) response {
 	t.Helper()
-	var cfg Config
-	if webUI != nil {
-		cfg.WebUI = webUI
+	auth, err := usecase.NewAuthService(usecase.AuthDeps{
+		Users: anyUser{}, Sessions: anySession{}, Hasher: noHasher{}, Tokens: plainTokens{},
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-	resp, err := NewServer(cfg, Services{}).Test(httptest.NewRequest("GET", path, nil))
+	req := httptest.NewRequest("GET", path, nil)
+	req.Header.Set("Cookie", sessionCookie+"=token")
+	resp, err := NewServer(Config{WebUI: webUI}, Services{Auth: auth}).Test(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,16 +63,17 @@ func TestServer_WithWebUI(t *testing.T) {
 		"index.html":    {Data: []byte("<!doctype html><div id=root></div>")},
 		"assets/app.js": {Data: []byte("console.log(1)")},
 	}
+	index := response{200, "text/html; charset=utf-8", "no-cache", "<!doctype html><div id=root></div>"}
 	cases := []struct {
 		path string
 		want response
 	}{
-		{"/", response{200, "text/html; charset=utf-8", "no-cache", "<!doctype html><div id=root></div>"}},
-		{"/brokerage", response{200, "text/html; charset=utf-8", "no-cache", "<!doctype html><div id=root></div>"}},
+		{"/", index},
+		{"/brokerage", index},
+		{"/index.html", index},
 		{"/assets/app.js", response{200, "text/javascript; charset=utf-8", "", "console.log(1)"}},
-		{"/index.html", response{200, "text/html; charset=utf-8", "no-cache", "<!doctype html><div id=root></div>"}},
 		{"/api/health", response{200, "application/json; charset=utf-8", "", `{"ok":true}`}},
-		{"/api/x", response{401, "application/json; charset=utf-8", "", `{"error":"not authenticated"}`}},
+		{"/api/x", response{404, "application/json; charset=utf-8", "", `{"error":"Not Found"}`}},
 	}
 	for _, c := range cases {
 		if got := get(t, webUI, c.path); got != c.want {
@@ -54,7 +84,7 @@ func TestServer_WithWebUI(t *testing.T) {
 
 func TestServer_APIOnlyWithoutWebUI(t *testing.T) {
 	want := response{404, "application/json; charset=utf-8", "", `{"error":"Not Found"}`}
-	for _, path := range []string{"/", "/brokerage", "/index.html"} {
+	for _, path := range []string{"/", "/brokerage", "/index.html", "/api/x"} {
 		if got := get(t, nil, path); got != want {
 			t.Errorf("GET %s = %+v, want %+v", path, got, want)
 		}
