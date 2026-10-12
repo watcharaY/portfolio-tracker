@@ -4,7 +4,7 @@
 
 | Goals | Non-goals (ตอนนี้) |
 |---|---|
-| ใช้คนเดียว ติดตั้งง่าย: app เป็น binary ไฟล์เดียว + Postgres ใน Docker | multi-user, roles |
+| ใช้คนเดียว ติดตั้งง่าย: frontend และ backend build/deploy แยกกัน + Postgres ใน Docker | multi-user, roles |
 | ข้อมูลอยู่ในเครื่องตัวเอง backup ด้วย `pg_dump` | realtime price feed |
 | ตัวเลขตรงกับ Excel เดิมทุกสตางค์ | mobile app |
 | มี login และ session ที่ปลอดภัยพอสำหรับเปิดผ่าน internet (หลัง HTTPS) | SSO / OAuth |
@@ -16,22 +16,26 @@ flowchart LR
     subgraph Browser
         SPA["React 19 + Vite SPA<br/>react-router"]
     end
-    subgraph "Go binary (single process)"
+    subgraph "web (Caddy)"
+        STATIC["/srv = web/dist<br/>SPA fallback → index.html · CSP"]
+        PROXY["handle /api/*<br/>reverse_proxy api:8080"]
+    end
+    subgraph "api (Go binary)"
         direction TB
         MW["Fiber v3 middleware<br/>recover · logger · helmet · limiter(login)"]
         AUTH["auth.Service<br/>bcrypt · session cookie"]
         API["/api handlers<br/>generic CRUD + dashboard"]
-        STATIC["webui (go:embed dist)<br/>SPA fallback → index.html"]
         MW --> AUTH --> API
-        MW --> STATIC
     end
     DB[("PostgreSQL 18 (Docker)<br/>tables + v_* views")]
-    SPA -- "HTTPS · cookie pt_session" --> MW
+    SPA -- "HTTPS · cookie pt_session" --> STATIC
+    SPA -- "/api/*" --> PROXY --> MW
     API --> DB
     AUTH --> DB
 ```
 
-- **Production**: `npm run build` เขียนไฟล์ลง `backend/internal/platform/webui/dist` แล้ว `go build` embed เข้า binary ได้ไฟล์ `.exe` ไฟล์เดียวที่ serve ทั้ง SPA และ API บน origin เดียวกัน (ไม่ต้องตั้ง CORS)
+- **Production**: `web/Dockerfile` build SPA ลง `web/dist` แล้วให้ Caddy serve และ proxy `/api/*` ไปที่ API จึงอยู่บน origin เดียวกัน (ไม่ต้องตั้ง CORS, cookie และ CSP เหมือนเดิม) `backend/Dockerfile` build API อย่างเดียว ทั้งสอง image build และ deploy แยกกันได้ ถ้า API ล่ม มีแค่ `/api` ที่ตอบ 502
+- **ไม่ใช้ Docker**: `make run` รัน binary ด้วย `WEB_DIR=../web/dist` ให้ Go serve SPA เองด้วย ถ้าไม่ตั้ง `WEB_DIR` จะ serve แค่ `/api`
 - **Dev**: Vite (:5173) proxy `/api` ไปที่ Go (:8080) ได้ HMR ทั้งฝั่ง frontend
 
 ## Repo layout
@@ -48,11 +52,14 @@ portfolio-tracker/
 │     │  └─ postgres/              # repositories, migrate (schema_migrations)
 │     │     ├─ migrations/20261012000000_init.sql
 │     │     ├─ queries/*.sql  # sqlc → internal/gen
-│     ├─ platform/                 # config, security (bcrypt, tokens), webui (go:embed)
+│     ├─ platform/                 # config, security (bcrypt, tokens)
 │     └─ app/                      # composition root
+│  └─ Dockerfile                   # API image (distroless, ENTRYPOINT = binary)
+├─ deploy/                         # docker-compose.yml (db, api, web) + .env.example
 ├─ .github/                        # CI workflow, dependabot
 ├─ Makefile                        # make help
 ├─ web/
+│  ├─ Caddyfile  Dockerfile        # web image: SPA + proxy /api
 │  └─ src/
 │     ├─ api.ts  auth.tsx  format.ts  hooks.ts
 │     ├─ components/ (Layout, ResourceTable)
@@ -145,14 +152,15 @@ sequenceDiagram
 | `SESSION_TTL` | `168h` | Go duration |
 | `COOKIE_SECURE` | `false` | `true` เมื่อใช้ HTTPS |
 | `CORS_ORIGIN` | (ว่าง) | ใช้เฉพาะตอน SPA อยู่คนละ origin |
+| `WEB_DIR` | (ว่าง) | serve SPA จากโฟลเดอร์นี้ด้วย (fallback → `index.html`, `index.html` เป็น no-cache) ถ้าว่าง non-`/api` ตอบ 404 |
 
 ## Deployment options
 
 | Option | วิธี | เหมาะกับ |
 |---|---|---|
-| A. รันบนเครื่องตัวเอง | `docker compose up -d` + `portfolio-tracker.exe` เปิดที่ localhost | ง่ายที่สุด |
-| B. Home server + Tailscale | binary + Postgres container บน mini-PC/NAS เปิดผ่าน tailnet | เข้าจากมือถือได้ ไม่เปิด port สู่ internet |
-| C. VPS + Caddy | Caddy ทำ TLS อัตโนมัติ, reverse proxy ไป :8080 (หรือใช้ managed Postgres เช่น Neon/Supabase) | เข้าจากที่ไหนก็ได้ (ต้องเปิด `COOKIE_SECURE`) |
+| A. รันบนเครื่องตัวเอง | `docker compose up -d` + `make run` เปิดที่ localhost:8080 | ง่ายที่สุด |
+| B. Home server + Tailscale | `make deploy-up` บน mini-PC/NAS เปิดผ่าน tailnet | เข้าจากมือถือได้ ไม่เปิด port สู่ internet |
+| C. VPS + Docker | `make deploy-up` โดยตั้ง `SITE_ADDRESS` เป็น domain จริง Caddy ทำ TLS ให้อัตโนมัติ | เข้าจากที่ไหนก็ได้ (ต้องเปิด `COOKIE_SECURE`) |
 
 ## Roadmap
 
