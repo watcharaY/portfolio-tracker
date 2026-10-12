@@ -6,6 +6,7 @@ SHELL := bash
 export DATABASE_URL ADDR SESSION_TTL COOKIE_SECURE CORS_ORIGIN
 POSTGRES_USER ?= portfolio
 POSTGRES_DB   ?= portfolio
+XLSX          ?= $(HOME)/Desktop/Portfolio-Tracker.xlsx
 
 BIN         := backend/portfolio-tracker$(if $(filter Windows_NT,$(OS)),.exe,)
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
@@ -41,6 +42,10 @@ db-reset: db-up ## DELETE ALL DATA, then re-run migrations (asks first; FORCE=1 
 
 db-psql: db-up ## Open a psql shell
 	docker compose exec db psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
+
+.PHONY: seed-sql
+seed-sql: ## Generate private/seed-data.sql from $(XLSX) (git-ignored, run once on a fresh DB)
+	cd backend && go run ./cmd/xlsx2sql -in "$(XLSX)" -out ../private/seed-data.sql
 
 .PHONY: dev-api dev-web
 dev-api: db-up ## Run the backend on :8080
