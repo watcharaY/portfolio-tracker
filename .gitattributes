@@ -2,3 +2,4 @@
 *.png binary
 *.woff binary
 *.woff2 binary
+backend/internal/adapter/postgres/internal/gen/** linguist-generated=true

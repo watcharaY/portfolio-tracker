@@ -39,6 +39,8 @@ jobs:
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
+      - name: Generated sqlc code is current
+        run: make sqlc-check
       - run: make vet
       - name: Migrations apply on a fresh database
         run: cd backend && go run ./cmd/server migrate
