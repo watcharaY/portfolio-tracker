@@ -27,7 +27,7 @@ flowchart LR
         API["/api handlers<br/>generic CRUD + dashboard"]
         MW --> AUTH --> API
     end
-    DB[("PostgreSQL 18 (Docker)<br/>tables + v_* views")]
+    DB[("PostgreSQL 18 (Docker)<br/>tables")]
     SPA -- "HTTPS · cookie pt_session" --> STATIC
     SPA -- "/api/*" --> PROXY --> MW
     API --> DB
@@ -115,18 +115,18 @@ sequenceDiagram
 | POST | `/api/auth/logout` | session (pending OK) | |
 | POST | `/api/auth/password` | session (pending OK) | `{currentPassword, newPassword}`, rate limited |
 | GET | `/api/dashboard` | session | totals + per class + allocation |
-| GET | `/api/{resource}` | session | list จาก `v_*` view, filter ได้ด้วย `?field=value` |
+| GET | `/api/{resource}` | session | list พร้อมค่าที่คำนวณแล้ว filter: `?year=` (salary, tax), `?broker_id=`, `?insurer_id=&year=` |
 | GET | `/api/{resource}/:id` | session | |
-| POST | `/api/{resource}` | session | create, ตอบ 201 พร้อม row จาก view |
+| POST | `/api/{resource}` | session | create, ตอบ 201 พร้อม row ที่คำนวณแล้ว |
 | PUT | `/api/{resource}/:id` | session | replace ทั้ง row |
 | DELETE | `/api/{resource}/:id` | session | 204 |
 
 `{resource}` = `brokers`, `broker-transactions`, `funds`, `pvd-years`, `savings-accounts`, `insurers`,
 `insurance-payments`, `salary-months`, `tax-deductions`
 
-**Generic CRUD**: แต่ละ resource ประกาศเป็น spec ใน `internal/adapter/http/resources.go` (table, view, fields + type/enum/required)
-ชื่อคอลัมน์ใน SQL มาจาก spec เท่านั้น ส่วนค่าจาก user ส่งผ่าน placeholder `$n` ทั้งหมด จึงไม่มีทาง SQL injection
-ถ้าจะเพิ่ม resource ใหม่ ให้เพิ่ม migration + spec 1 ก้อน + page ฝั่ง React 1 ไฟล์
+**Generic CRUD**: `mount()` ใน `internal/adapter/http/crud.go` สร้าง 5 route ให้ทุก resource จาก `resource{decode, filter, present}` ใน `resources.go` และ `usecase.CRUD` เรียก `Validate()` ของ domain ก่อนเขียน
+SQL ทั้งหมดอยู่ใน `adapter/postgres/queries/*.sql` ที่ sqlc generate เป็น Go ค่าจาก user ส่งผ่าน placeholder `$n` จึงไม่มีทาง SQL injection
+ถ้าจะเพิ่ม resource ใหม่: migration + query ใน `queries/` (`make sqlc`) + entity ใน `domain` + repository + `resource` 1 ก้อน + page ฝั่ง React 1 ไฟล์ แล้วเพิ่ม case ใน `internal/app/api_test.go`
 
 ## Security checklist
 

@@ -59,13 +59,13 @@ sequenceDiagram
 
     O->>UI: เปิด /brokerage
     UI->>API: GET /api/brokers
-    API->>DB: SELECT * FROM v_brokers
-    DB-->>API: rows (+computed)
+    API->>DB: SELECT brokers + SUM(deposit/withdraw)
+    DB-->>API: rows
     API-->>UI: JSON
     O->>UI: Edit Broker A → Current Value = 100,000.00
-    UI->>API: PATCH /api/brokers/1 {current_value: 10000000}
+    UI->>API: PUT /api/brokers/1 {name, current_value: 10000000, note}
     API->>DB: UPDATE brokers SET ... , updated_at=now
-    API-->>UI: row ใหม่จาก v_brokers (P/L อัปเดตแล้ว)
+    API-->>UI: row ใหม่ (P/L คำนวณใน domain)
     O->>UI: เปิด Dashboard
     UI->>API: GET /api/dashboard
     API-->>UI: totals + allocation
