@@ -1,0 +1,960 @@
+openapi: 3.0.3
+info:
+  title: Portfolio Tracker API
+  version: "1.0"
+  description: |
+    Every amount of money is an integer number of satang (100 = ฿1.00) and every
+    interest rate is in basis points (250 = 2.5%). Computed fields such as P/L and
+    percentages are read-only.
+
+    Sign in through `POST /auth/login`; the session cookie `pt_session` then
+    authenticates every other call. Until the seeded admin changes its password,
+    data endpoints answer 403 `PASSWORD_CHANGE_REQUIRED`. `POST` and `PUT` bodies
+    must be sent as `application/json`.
+servers:
+  - url: /api
+security:
+  - session: []
+tags:
+  - name: auth
+  - name: dashboard
+  - name: brokerage
+  - name: funds
+  - name: pvd
+  - name: savings
+  - name: insurance
+  - name: salary
+  - name: docs
+
+paths:
+  /health:
+    get:
+      tags: [auth]
+      summary: Liveness check
+      security: []
+      responses:
+        "200":
+          description: The API is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Sign in and receive the session cookie
+      description: Rate limited to 10 requests per minute per IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: Signed in. The response sets the `pt_session` cookie.
+          content: { application/json: { schema: { $ref: "#/components/schemas/User" } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: The signed-in user
+      description: Works while a password change is still pending.
+      responses:
+        "200":
+          description: Current user.
+          content: { application/json: { schema: { $ref: "#/components/schemas/User" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: End the current session
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "204": { description: Signed out and the cookie is cleared. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+
+  /auth/password:
+    post:
+      tags: [auth]
+      summary: Change the password
+      description: |
+        Revokes every other session of the user. Works while a password change is
+        pending. Rate limited to 10 requests per minute per IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string }
+      responses:
+        "200":
+          description: Password changed.
+          content: { application/json: { schema: { $ref: "#/components/schemas/User" } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /dashboard:
+    get:
+      tags: [dashboard]
+      summary: Portfolio totals per asset class
+      responses:
+        "200":
+          description: Totals, P/L and allocation.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Dashboard" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /brokers:
+    get:
+      tags: [brokerage]
+      summary: List brokers with deposits, withdrawals and P/L
+      responses:
+        "200": { description: Brokers., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Broker" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [brokerage]
+      summary: Create a broker
+      requestBody: { $ref: "#/components/requestBodies/Broker" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Broker" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+  /brokers/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [brokerage]
+      summary: Get a broker
+      responses:
+        "200": { description: Broker., content: { application/json: { schema: { $ref: "#/components/schemas/Broker" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [brokerage]
+      summary: Replace a broker
+      requestBody: { $ref: "#/components/requestBodies/Broker" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/Broker" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+    delete:
+      tags: [brokerage]
+      summary: Delete a broker and its transactions
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /broker-transactions:
+    get:
+      tags: [brokerage]
+      summary: List deposits and withdrawals
+      parameters:
+        - { name: broker_id, in: query, required: false, schema: { type: integer, format: int64 } }
+      responses:
+        "200": { description: Transactions., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/BrokerTransaction" } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [brokerage]
+      summary: Record a deposit or withdrawal
+      requestBody: { $ref: "#/components/requestBodies/BrokerTransaction" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/BrokerTransaction" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+  /broker-transactions/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [brokerage]
+      summary: Get a transaction
+      responses:
+        "200": { description: Transaction., content: { application/json: { schema: { $ref: "#/components/schemas/BrokerTransaction" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [brokerage]
+      summary: Replace a transaction
+      requestBody: { $ref: "#/components/requestBodies/BrokerTransaction" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/BrokerTransaction" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+    delete:
+      tags: [brokerage]
+      summary: Delete a transaction
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /funds:
+    get:
+      tags: [funds]
+      summary: List mutual funds
+      responses:
+        "200": { description: Funds., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Fund" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [funds]
+      summary: Create a fund
+      requestBody: { $ref: "#/components/requestBodies/Fund" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Fund" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+  /funds/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [funds]
+      summary: Get a fund
+      responses:
+        "200": { description: Fund., content: { application/json: { schema: { $ref: "#/components/schemas/Fund" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [funds]
+      summary: Replace a fund
+      requestBody: { $ref: "#/components/requestBodies/Fund" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/Fund" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+    delete:
+      tags: [funds]
+      summary: Delete a fund
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /pvd-years:
+    get:
+      tags: [pvd]
+      summary: List provident fund years
+      responses:
+        "200": { description: PVD years., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PvdYear" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [pvd]
+      summary: Add a provident fund year
+      requestBody: { $ref: "#/components/requestBodies/PvdYear" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/PvdYear" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+  /pvd-years/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [pvd]
+      summary: Get a provident fund year
+      responses:
+        "200": { description: PVD year., content: { application/json: { schema: { $ref: "#/components/schemas/PvdYear" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [pvd]
+      summary: Replace a provident fund year
+      requestBody: { $ref: "#/components/requestBodies/PvdYear" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/PvdYear" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+    delete:
+      tags: [pvd]
+      summary: Delete a provident fund year
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /savings-accounts:
+    get:
+      tags: [savings]
+      summary: List savings accounts with yearly interest
+      responses:
+        "200": { description: Accounts., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/SavingsAccount" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [savings]
+      summary: Create a savings account
+      requestBody: { $ref: "#/components/requestBodies/SavingsAccount" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/SavingsAccount" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+  /savings-accounts/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [savings]
+      summary: Get a savings account
+      responses:
+        "200": { description: Account., content: { application/json: { schema: { $ref: "#/components/schemas/SavingsAccount" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [savings]
+      summary: Replace a savings account
+      requestBody: { $ref: "#/components/requestBodies/SavingsAccount" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/SavingsAccount" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+    delete:
+      tags: [savings]
+      summary: Delete a savings account
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /insurers:
+    get:
+      tags: [insurance]
+      summary: List insurers with premium totals
+      responses:
+        "200": { description: Insurers., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Insurer" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [insurance]
+      summary: Create an insurer
+      requestBody: { $ref: "#/components/requestBodies/Insurer" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Insurer" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+  /insurers/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [insurance]
+      summary: Get an insurer
+      responses:
+        "200": { description: Insurer., content: { application/json: { schema: { $ref: "#/components/schemas/Insurer" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [insurance]
+      summary: Replace an insurer
+      requestBody: { $ref: "#/components/requestBodies/Insurer" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/Insurer" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+    delete:
+      tags: [insurance]
+      summary: Delete an insurer and its payments
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /insurance-payments:
+    get:
+      tags: [insurance]
+      summary: List premium payments
+      parameters:
+        - { name: insurer_id, in: query, required: false, schema: { type: integer, format: int64 } }
+        - { name: year, in: query, required: false, schema: { type: integer } }
+      responses:
+        "200": { description: Payments., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/InsurancePayment" } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [insurance]
+      summary: Record a premium payment
+      requestBody: { $ref: "#/components/requestBodies/InsurancePayment" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/InsurancePayment" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+  /insurance-payments/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [insurance]
+      summary: Get a premium payment
+      responses:
+        "200": { description: Payment., content: { application/json: { schema: { $ref: "#/components/schemas/InsurancePayment" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [insurance]
+      summary: Replace a premium payment
+      requestBody: { $ref: "#/components/requestBodies/InsurancePayment" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/InsurancePayment" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+    delete:
+      tags: [insurance]
+      summary: Delete a premium payment
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /salary-months:
+    get:
+      tags: [salary]
+      summary: List salary months
+      parameters:
+        - { name: year, in: query, required: false, schema: { type: integer } }
+      responses:
+        "200": { description: Salary months., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/SalaryMonth" } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [salary]
+      summary: Record a salary month
+      requestBody: { $ref: "#/components/requestBodies/SalaryMonth" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/SalaryMonth" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+  /salary-months/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [salary]
+      summary: Get a salary month
+      responses:
+        "200": { description: Salary month., content: { application/json: { schema: { $ref: "#/components/schemas/SalaryMonth" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [salary]
+      summary: Replace a salary month
+      requestBody: { $ref: "#/components/requestBodies/SalaryMonth" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/SalaryMonth" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+    delete:
+      tags: [salary]
+      summary: Delete a salary month
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tax-deductions:
+    get:
+      tags: [salary]
+      summary: List tax deductions
+      parameters:
+        - { name: year, in: query, required: false, schema: { type: integer } }
+      responses:
+        "200": { description: Deductions., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/TaxDeduction" } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [salary]
+      summary: Add a tax deduction
+      requestBody: { $ref: "#/components/requestBodies/TaxDeduction" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/TaxDeduction" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+  /tax-deductions/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [salary]
+      summary: Get a tax deduction
+      responses:
+        "200": { description: Deduction., content: { application/json: { schema: { $ref: "#/components/schemas/TaxDeduction" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [salary]
+      summary: Replace a tax deduction
+      requestBody: { $ref: "#/components/requestBodies/TaxDeduction" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/TaxDeduction" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+    delete:
+      tags: [salary]
+      summary: Delete a tax deduction
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /openapi.yaml:
+    get:
+      tags: [docs]
+      summary: This document
+      responses:
+        "200": { description: OpenAPI document., content: { application/yaml: { schema: { type: string } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /docs:
+    get:
+      tags: [docs]
+      summary: Swagger UI for this document
+      responses:
+        "200": { description: HTML page., content: { text/html: { schema: { type: string } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: pt_session
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+
+  responses:
+    BadRequest:
+      description: Invalid JSON, unknown field, wrong type or a failed validation. `field` names the offending field when known.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: No valid session, or wrong username or password.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: The password must be changed first (`PASSWORD_CHANGE_REQUIRED`).
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: No row with this id.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Conflict:
+      description: A unique value already exists, or the referenced parent row does not.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    UnsupportedMediaType:
+      description: The body was not sent as application/json.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    TooManyRequests:
+      description: Rate limit reached; retry after a minute.
+
+  requestBodies:
+    Broker:
+      required: true
+      content: { application/json: { schema: { $ref: "#/components/schemas/BrokerInput" } } }
+    BrokerTransaction:
+      required: true
+      content: { application/json: { schema: { $ref: "#/components/schemas/BrokerTransactionInput" } } }
+    Fund:
+      required: true
+      content: { application/json: { schema: { $ref: "#/components/schemas/FundInput" } } }
+    PvdYear:
+      required: true
+      content: { application/json: { schema: { $ref: "#/components/schemas/PvdYearInput" } } }
+    SavingsAccount:
+      required: true
+      content: { application/json: { schema: { $ref: "#/components/schemas/SavingsAccountInput" } } }
+    Insurer:
+      required: true
+      content: { application/json: { schema: { $ref: "#/components/schemas/InsurerInput" } } }
+    InsurancePayment:
+      required: true
+      content: { application/json: { schema: { $ref: "#/components/schemas/InsurancePaymentInput" } } }
+    SalaryMonth:
+      required: true
+      content: { application/json: { schema: { $ref: "#/components/schemas/SalaryMonthInput" } } }
+    TaxDeduction:
+      required: true
+      content: { application/json: { schema: { $ref: "#/components/schemas/TaxDeductionInput" } } }
+
+  # Inputs: a missing or null field counts as zero or empty, which is how the web
+  # app sends blank cells. Unknown fields are rejected.
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: { type: string }
+        field: { type: string, description: "The offending field, when known." }
+
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, username, mustChangePassword]
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string }
+        mustChangePassword: { type: boolean }
+
+    Satang:
+      type: integer
+      format: int64
+      description: Money in satang (100 = ฿1.00).
+    Ratio:
+      type: number
+      nullable: true
+      description: A fraction (0.05 = 5%); null when the base is zero.
+    Timestamp:
+      type: string
+      format: date-time
+
+    AssetClass:
+      type: object
+      additionalProperties: false
+      required: [key, label, value, cost, pl, plPct, allocationPct]
+      properties:
+        key: { type: string, enum: [stocks, funds, pvd, savings, insurance, total] }
+        label: { type: string }
+        value: { $ref: "#/components/schemas/Satang" }
+        cost: { $ref: "#/components/schemas/Satang" }
+        pl: { $ref: "#/components/schemas/Satang" }
+        plPct: { $ref: "#/components/schemas/Ratio" }
+        allocationPct: { $ref: "#/components/schemas/Ratio" }
+    Dashboard:
+      type: object
+      additionalProperties: false
+      required: [total, classes, estSavingsInterestPerYear]
+      properties:
+        total: { $ref: "#/components/schemas/AssetClass" }
+        classes: { type: array, items: { $ref: "#/components/schemas/AssetClass" } }
+        estSavingsInterestPerYear: { $ref: "#/components/schemas/Satang" }
+
+    BrokerInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, nullable: true }
+        current_value: { type: integer, format: int64, nullable: true, minimum: 0 }
+        note: { type: string, nullable: true }
+    Broker:
+      type: object
+      additionalProperties: false
+      required: [id, name, current_value, note, deposits, withdrawals, net_capital, unrealised_pl, pl_pct, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        current_value: { $ref: "#/components/schemas/Satang" }
+        note: { type: string }
+        deposits: { $ref: "#/components/schemas/Satang" }
+        withdrawals: { $ref: "#/components/schemas/Satang" }
+        net_capital: { $ref: "#/components/schemas/Satang" }
+        unrealised_pl: { $ref: "#/components/schemas/Satang" }
+        pl_pct: { $ref: "#/components/schemas/Ratio" }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+        updated_at: { $ref: "#/components/schemas/Timestamp" }
+
+    BrokerTransactionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        broker_id: { type: integer, format: int64, nullable: true }
+        txn_date: { type: string, format: date, nullable: true }
+        type: { type: string, nullable: true, description: "deposit or withdraw" }
+        amount: { type: integer, format: int64, nullable: true }
+        note: { type: string, nullable: true }
+    BrokerTransaction:
+      type: object
+      additionalProperties: false
+      required: [id, broker_id, broker_name, txn_date, type, amount, note, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        broker_id: { type: integer, format: int64 }
+        broker_name: { type: string }
+        txn_date: { type: string, format: date, nullable: true }
+        type: { type: string, enum: [deposit, withdraw] }
+        amount: { $ref: "#/components/schemas/Satang" }
+        note: { type: string }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+        updated_at: { $ref: "#/components/schemas/Timestamp" }
+
+    FundInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, nullable: true }
+        category: { type: string, nullable: true, description: "Equity, Fixed Income, Money Market, Mixed, Gold, SSF, RMF, ThaiESG or Other" }
+        cost: { type: integer, format: int64, nullable: true }
+        market_value: { type: integer, format: int64, nullable: true }
+        note: { type: string, nullable: true }
+    Fund:
+      type: object
+      additionalProperties: false
+      required: [id, name, category, cost, market_value, unrealised_pl, pl_pct, note, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        category: { type: string, enum: [Equity, Fixed Income, Money Market, Mixed, Gold, SSF, RMF, ThaiESG, Other] }
+        cost: { $ref: "#/components/schemas/Satang" }
+        market_value: { $ref: "#/components/schemas/Satang" }
+        unrealised_pl: { $ref: "#/components/schemas/Satang" }
+        pl_pct: { $ref: "#/components/schemas/Ratio" }
+        note: { type: string }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+        updated_at: { $ref: "#/components/schemas/Timestamp" }
+
+    PvdYearInput:
+      type: object
+      additionalProperties: false
+      properties:
+        year: { type: integer, nullable: true }
+        self_contribution: { type: integer, format: int64, nullable: true }
+        company_contribution: { type: integer, format: int64, nullable: true }
+        self_profit: { type: integer, format: int64, nullable: true }
+        company_profit: { type: integer, format: int64, nullable: true }
+        fund_allocation: { type: string, nullable: true }
+    PvdYear:
+      type: object
+      additionalProperties: false
+      required: [id, year, self_contribution, company_contribution, self_profit, company_profit, fund_allocation, total_contribution, total_profit, value, return_pct, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        year: { type: integer }
+        self_contribution: { $ref: "#/components/schemas/Satang" }
+        company_contribution: { $ref: "#/components/schemas/Satang" }
+        self_profit: { $ref: "#/components/schemas/Satang" }
+        company_profit: { $ref: "#/components/schemas/Satang" }
+        fund_allocation: { type: string }
+        total_contribution: { $ref: "#/components/schemas/Satang" }
+        total_profit: { $ref: "#/components/schemas/Satang" }
+        value: { $ref: "#/components/schemas/Satang" }
+        return_pct: { $ref: "#/components/schemas/Ratio" }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+        updated_at: { $ref: "#/components/schemas/Timestamp" }
+
+    SavingsAccountInput:
+      type: object
+      additionalProperties: false
+      properties:
+        bank: { type: string, nullable: true }
+        balance: { type: integer, format: int64, nullable: true }
+        interest_bp: { type: integer, nullable: true, description: Basis points (250 = 2.5%). }
+        note: { type: string, nullable: true }
+    SavingsAccount:
+      type: object
+      additionalProperties: false
+      required: [id, bank, balance, interest_bp, note, interest_per_year, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        bank: { type: string }
+        balance: { $ref: "#/components/schemas/Satang" }
+        interest_bp: { type: integer, minimum: 0, maximum: 10000 }
+        note: { type: string }
+        interest_per_year: { $ref: "#/components/schemas/Satang" }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+        updated_at: { $ref: "#/components/schemas/Timestamp" }
+
+    InsurerInput:
+      type: object
+      additionalProperties: false
+      properties:
+        company: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+    Insurer:
+      type: object
+      additionalProperties: false
+      required: [id, company, note, payments, total_paid, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        company: { type: string }
+        note: { type: string }
+        payments: { type: integer }
+        total_paid: { $ref: "#/components/schemas/Satang" }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+        updated_at: { $ref: "#/components/schemas/Timestamp" }
+
+    InsurancePaymentInput:
+      type: object
+      additionalProperties: false
+      properties:
+        insurer_id: { type: integer, format: int64, nullable: true }
+        year: { type: integer, nullable: true }
+        premium: { type: integer, format: int64, nullable: true }
+        note: { type: string, nullable: true }
+    InsurancePayment:
+      type: object
+      additionalProperties: false
+      required: [id, insurer_id, year, premium, note, company, payment_no, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        insurer_id: { type: integer, format: int64 }
+        year: { type: integer, nullable: true }
+        premium: { $ref: "#/components/schemas/Satang" }
+        note: { type: string }
+        company: { type: string }
+        payment_no: { type: integer, description: 1-based order of the payment within its insurer. }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+        updated_at: { $ref: "#/components/schemas/Timestamp" }
+
+    SalaryMonthInput:
+      type: object
+      additionalProperties: false
+      properties:
+        year: { type: integer, nullable: true }
+        month: { type: integer, nullable: true }
+        salary: { type: integer, format: int64, nullable: true }
+        bonus: { type: integer, format: int64, nullable: true }
+        withholding_tax: { type: integer, format: int64, nullable: true }
+        pvd: { type: integer, format: int64, nullable: true }
+        sso: { type: integer, format: int64, nullable: true }
+    SalaryMonth:
+      type: object
+      additionalProperties: false
+      required: [id, year, month, salary, bonus, withholding_tax, pvd, sso, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        year: { type: integer }
+        month: { type: integer, minimum: 1, maximum: 12 }
+        salary: { $ref: "#/components/schemas/Satang" }
+        bonus: { $ref: "#/components/schemas/Satang" }
+        withholding_tax: { $ref: "#/components/schemas/Satang" }
+        pvd: { $ref: "#/components/schemas/Satang" }
+        sso: { $ref: "#/components/schemas/Satang" }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+        updated_at: { $ref: "#/components/schemas/Timestamp" }
+
+    TaxDeductionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        year: { type: integer, nullable: true }
+        item: { type: string, nullable: true }
+        amount: { type: integer, format: int64, nullable: true }
+    TaxDeduction:
+      type: object
+      additionalProperties: false
+      required: [id, year, item, amount, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        year: { type: integer }
+        item: { type: string }
+        amount: { $ref: "#/components/schemas/Satang" }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+        updated_at: { $ref: "#/components/schemas/Timestamp" }

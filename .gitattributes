@@ -3,3 +3,4 @@
 *.woff binary
 *.woff2 binary
 backend/internal/adapter/postgres/internal/gen/** linguist-generated=true
+backend/internal/adapter/http/openapi/swagger-ui/** linguist-vendored -diff

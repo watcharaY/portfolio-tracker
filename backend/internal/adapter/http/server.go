@@ -2,6 +2,7 @@ package http
 
 import (
 	"io/fs"
+	"path"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/static"
 
+	"github.com/watcharaY/portfolio-tracker/backend/internal/adapter/http/openapi"
 	"github.com/watcharaY/portfolio-tracker/backend/internal/usecase"
 )
 
@@ -87,12 +89,32 @@ func NewServer(cfg Config, s Services) *fiber.App {
 	mount(priv, "/insurance-payments", paymentResource(s.InsurancePayments))
 	mount(priv, "/salary-months", salaryResource(s.Salary))
 	mount(priv, "/tax-deductions", deductionResource(s.TaxDeductions))
+	mountDocs(priv)
 	api.Use(func(fiber.Ctx) error { return fiber.ErrNotFound })
 
 	if cfg.WebUI != nil {
 		mountSPA(app, cfg.WebUI)
 	}
 	return app
+}
+
+// mountDocs serves the OpenAPI document and its Swagger UI. They sit behind the
+// session like the rest of the API, so the docs are only visible once signed in.
+func mountDocs(r fiber.Router) {
+	r.Get("/openapi.yaml", func(c fiber.Ctx) error {
+		c.Set(fiber.HeaderContentType, "application/yaml")
+		return c.Send(openapi.Spec)
+	})
+	r.Get("/docs", func(c fiber.Ctx) error { return sendDocsFile(c, "docs.html") })
+	r.Get("/docs/*", func(c fiber.Ctx) error { return sendDocsFile(c, c.Params("*")) })
+}
+
+func sendDocsFile(c fiber.Ctx, name string) error {
+	data, err := fs.ReadFile(openapi.UI, name)
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	return c.Type(strings.TrimPrefix(path.Ext(name), ".")).Send(data)
 }
 
 // requireJSONBody rejects POST/PUT bodies that are not application/json. Browsers

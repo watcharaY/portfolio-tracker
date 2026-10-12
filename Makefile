@@ -66,6 +66,14 @@ e2e-seed: db-up ## Recreate $(POSTGRES_DB)_e2e with made-up data from backend/te
 	docker compose exec -T db psql -v ON_ERROR_STOP=1 -U $(POSTGRES_USER) -d $(E2E_DB) -q < backend/testdata/e2e-seed.sql
 	@echo "Seeded $(E2E_DB): log in as e2e / E2e-Tiger-Mango-42, or admin / admin for the forced password change"
 
+SWAGGER_UI_VERSION := 5.33.0
+SWAGGER_UI_DIR     := backend/internal/adapter/http/openapi/swagger-ui
+
+.PHONY: swagger-ui
+swagger-ui: ## Vendor swagger-ui-dist $(SWAGGER_UI_VERSION) (bundle + css) for /api/docs
+	tmp=$$(mktemp -d); (cd "$$tmp" && npm pack -s swagger-ui-dist@$(SWAGGER_UI_VERSION) >/dev/null && tar xzf swagger-ui-dist-$(SWAGGER_UI_VERSION).tgz); 		mkdir -p $(SWAGGER_UI_DIR) && cp "$$tmp"/package/{swagger-ui-bundle.js,swagger-ui.css,LICENSE,NOTICE} $(SWAGGER_UI_DIR)/ && rm -rf "$$tmp"
+	echo $(SWAGGER_UI_VERSION) > $(SWAGGER_UI_DIR)/VERSION
+
 .PHONY: migration
 migration: ## Create an empty migration: make migration name=add_fund_tags
 	@[[ "$(name)" =~ ^[a-z0-9_]+$$ ]] || { echo "name must be snake_case, e.g. make migration name=add_fund_tags"; exit 1; }

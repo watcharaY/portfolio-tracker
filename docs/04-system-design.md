@@ -115,6 +115,8 @@ sequenceDiagram
 | POST | `/api/auth/logout` | session (pending OK) | |
 | POST | `/api/auth/password` | session (pending OK) | `{currentPassword, newPassword}`, rate limited |
 | GET | `/api/dashboard` | session | totals + per class + allocation |
+| GET | `/api/openapi.yaml` | session | OpenAPI 3.0 ของ API ทั้งหมด |
+| GET | `/api/docs` | session | Swagger UI (ไฟล์ swagger-ui vendored ใน binary ผ่าน CSP `self`) |
 | GET | `/api/{resource}` | session | list พร้อมค่าที่คำนวณแล้ว filter: `?year=` (salary, tax), `?broker_id=`, `?insurer_id=&year=` |
 | GET | `/api/{resource}/:id` | session | |
 | POST | `/api/{resource}` | session | create, ตอบ 201 พร้อม row ที่คำนวณแล้ว |
@@ -126,7 +128,7 @@ sequenceDiagram
 
 **Generic CRUD**: `mount()` ใน `internal/adapter/http/crud.go` สร้าง 5 route ให้ทุก resource จาก `resource{decode, filter, present}` ใน `resources.go` และ `usecase.CRUD` เรียก `Validate()` ของ domain ก่อนเขียน
 SQL ทั้งหมดอยู่ใน `adapter/postgres/queries/*.sql` ที่ sqlc generate เป็น Go ค่าจาก user ส่งผ่าน placeholder `$n` จึงไม่มีทาง SQL injection
-ถ้าจะเพิ่ม resource ใหม่: migration + query ใน `queries/` (`make sqlc`) + entity ใน `domain` + repository + `resource` 1 ก้อน + page ฝั่ง React 1 ไฟล์ แล้วเพิ่ม case ใน `internal/app/api_test.go`
+ถ้าจะเพิ่ม resource ใหม่: migration + query ใน `queries/` (`make sqlc`) + entity ใน `domain` + repository + `resource` 1 ก้อน + path/schema ใน `openapi.yaml` + page ฝั่ง React 1 ไฟล์ แล้วเพิ่ม case ใน `internal/app/api_test.go` (test จะ fail ถ้า route ไม่อยู่ใน `openapi.yaml` หรือ response ไม่ตรง schema)
 
 ## Security checklist
 
