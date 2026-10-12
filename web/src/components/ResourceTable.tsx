@@ -164,7 +164,7 @@ export default function ResourceTable({ path, title, hint, addLabel, columns, fi
           <h2>{title}</h2>
           {hint && <p className="muted small">{hint}</p>}
         </div>
-        <button className="primary" onClick={startNew} disabled={editing !== null}>
+        <button type="button" className="primary" onClick={startNew} disabled={editing !== null}>
           {addLabel}
         </button>
       </header>
@@ -185,7 +185,7 @@ export default function ResourceTable({ path, title, hint, addLabel, columns, fi
           <tbody>
             {rows.map((row) =>
               editing === row.id ? (
-                editRow(String(row.id))
+                editRow(`edit-${row.id}`)
               ) : (
                 <tr key={String(row.id)}>
                   {columns.map((c) => (
@@ -194,10 +194,10 @@ export default function ResourceTable({ path, title, hint, addLabel, columns, fi
                     </td>
                   ))}
                   <td className="actions">
-                    <button className="quiet" onClick={() => startEdit(row)} disabled={editing !== null}>
+                    <button type="button" className="quiet" onClick={() => startEdit(row)} disabled={editing !== null}>
                       Edit
                     </button>
-                    <button className="quiet danger" onClick={() => remove(row)} disabled={editing !== null}>
+                    <button type="button" className="quiet danger" onClick={() => remove(row)} disabled={editing !== null}>
                       Delete
                     </button>
                   </td>
