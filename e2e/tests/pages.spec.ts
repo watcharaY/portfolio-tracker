@@ -286,3 +286,73 @@ test.describe('Salary & tax', () => {
     await expect(deductions.rows).toHaveCount(0)
   })
 })
+
+test.describe('Dividends', () => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const money = (satang: number) => (satang / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(2)}%`
+
+  async function showYear(page: Page, year: number) {
+    await page.locator('header.page-head').getByLabel('Year').fill(String(year))
+  }
+  const summary = (page: Page, year: number) =>
+    page.locator('section.ledger').filter({ has: page.getByRole('heading', { name: `By asset ${year}`, exact: true }) })
+
+  test('the yearly summary shows each asset, the months it paid and its yield', async ({ page }) => {
+    await page.goto('/dividends')
+    await showYear(page, 2025)
+    const table = summary(page, 2025)
+    const want = expected.dividends2025
+    for (const s of Object.values(want.sources) as { name: string; payments: number; months: number[]; gross: number; withholdingTax: number; net: number; yieldPct: number }[]) {
+      const row = table.locator('tbody tr').filter({ has: page.getByRole('cell', { name: s.name, exact: true }) })
+      await expect(row.locator('td'), s.name).toHaveText([
+        s.name,
+        /.+/,
+        String(s.payments),
+        s.months.map((m) => months[m - 1]).join(', '),
+        money(s.gross),
+        money(s.withholdingTax),
+        money(s.net),
+        pct(s.yieldPct),
+      ])
+    }
+    await expect(table.locator('tfoot td.num')).toHaveText([String(want.payments), money(want.gross), money(want.withholdingTax), money(want.net)])
+    await expect(resourceTable(page, 'Payments 2025').rows).toHaveCount(want.payments)
+  })
+
+  test('a recorded payment shows up in the summary; tax above gross is refused', async ({ page }) => {
+    await page.goto('/dividends')
+    await showYear(page, 2025)
+    const payments = resourceTable(page, 'Payments 2025')
+    const table = summary(page, 2025)
+
+    await payments.add({ Date: '2025-07-01', Source: 'Fund · Fund Bond B', Gross: '1000', 'Withholding Tax': '100', Note: 'e2e-dividend' })
+    await expectCells(payments, 'e2e-dividend', { Net: '900.00' })
+    const row = table.locator('tbody tr').filter({ hasText: 'Fund Bond B' })
+    await expect(row.locator('td').nth(3)).toHaveText('Jul')
+
+    await payments.edit('e2e-dividend', { Gross: '2000' })
+    await expectCells(payments, 'e2e-dividend', { Net: '1,900.00' })
+    await expect(row.locator('td').nth(6)).toHaveText('1,900.00')
+
+    await payments.startEdit('e2e-dividend')
+    await payments.fill({ 'Withholding Tax': '5000' })
+    await payments.save()
+    await expect(payments.error).toContainText('withholding_tax must be between 0 and the gross amount')
+    await payments.cancel()
+
+    await payments.remove('e2e-dividend')
+    await expect(row).toHaveCount(0)
+  })
+
+  test('the year selector switches both tables', async ({ page }) => {
+    await page.goto('/dividends')
+    await showYear(page, 2026)
+    await expect(resourceTable(page, 'Payments 2026').rows).toHaveCount(expected.dividends2026.payments)
+    await expect(summary(page, 2026).locator('tfoot td.num').last()).toHaveText(money(expected.dividends2026.net))
+
+    await showYear(page, 2031)
+    await expect(summary(page, 2031).locator('td.empty')).toBeVisible()
+    await expect(resourceTable(page, 'Payments 2031').rows).toHaveCount(0)
+  })
+})

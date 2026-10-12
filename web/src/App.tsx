@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import Brokerage from './pages/Brokerage'
 import ChangePassword from './pages/ChangePassword'
 import Dashboard from './pages/Dashboard'
+import Dividends from './pages/Dividends'
 import Funds from './pages/Funds'
 import Insurance from './pages/Insurance'
 import Login from './pages/Login'
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="pvd" element={<Pvd />} />
         <Route path="savings" element={<Savings />} />
         <Route path="insurance" element={<Insurance />} />
+        <Route path="dividends" element={<Dividends />} />
         <Route path="salary" element={<SalaryTax />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -8,7 +8,7 @@ test.skip(!process.env.UPDATE_SCREENSHOTS, 'set UPDATE_SCREENSHOTS=1 to refresh 
 
 const image = (name: string) => fileURLToPath(new URL(`../../docs/images/${name}`, import.meta.url))
 const shots: Record<'light' | 'dark', [string, string][]> = {
-  light: [['/', 'dashboard-light.png'], ['/brokerage', 'brokerage-light.png'], ['/insurance', 'insurance-light.png']],
+  light: [['/', 'dashboard-light.png'], ['/brokerage', 'brokerage-light.png'], ['/insurance', 'insurance-light.png'], ['/dividends', 'dividends-light.png']],
   dark: [['/', 'dashboard-dark.png']],
 }
 
@@ -25,6 +25,9 @@ for (const scheme of ['light', 'dark'] as const) {
     await signIn(context, baseURL!, expected.users.ready.username)
     for (const [path, file] of shots[scheme]) {
       await page.goto(path)
+      // Pages with a year selector open on the seed's fullest year.
+      const year = page.locator('header.page-head').getByLabel('Year')
+      if (await year.count()) await year.fill('2025')
       await page.waitForLoadState('networkidle')
       await page.screenshot({ path: image(file) })
     }

@@ -13,6 +13,7 @@ const tables = [
   { path: '/insurance', title: 'Premium log', row: 'satang, no year', field: 'Note' },
   { path: '/salary', title: 'Monthly income 2025', row: 'Mar', field: 'Bonus', year: 2025 },
   { path: '/salary', title: 'Deductions 2025', row: 'Life insurance', field: 'Item', year: 2025 },
+  { path: '/dividends', title: 'Payments 2025', row: '2025-04-20', field: 'Note', year: 2025 },
 ]
 
 test.beforeAll(resetDB)

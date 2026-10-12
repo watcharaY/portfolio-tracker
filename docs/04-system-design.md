@@ -125,7 +125,9 @@ sequenceDiagram
 | DELETE | `/api/{resource}/:id` | session | 204 |
 
 `{resource}` = `brokers`, `broker-transactions`, `funds`, `pvd-years`, `savings-accounts`, `insurers`,
-`insurance-payments`, `salary-months`, `tax-deductions`
+`insurance-payments`, `salary-months`, `tax-deductions`, `dividends`
+
+`GET /api/dividends/summary?year=` ให้ยอดรวมต่อ asset ของปีนั้น (จำนวนครั้ง, เดือนที่จ่าย, gross, ภาษีหัก ณ ที่จ่าย, net, yield = net ÷ มูลค่าปัจจุบันของ asset)
 
 **Generic CRUD**: `mount()` ใน `internal/adapter/http/crud.go` สร้าง 5 route ให้ทุก resource จาก `resource{decode, filter, present}` ใน `resources.go` และ `usecase.CRUD` เรียก `Validate()` ของ domain ก่อนเขียน
 SQL ทั้งหมดอยู่ใน `adapter/postgres/queries/*.sql` ที่ sqlc generate เป็น Go ค่าจาก user ส่งผ่าน placeholder `$n` จึงไม่มีทาง SQL injection

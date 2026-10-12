@@ -15,6 +15,7 @@ flowchart LR
     Dash --- P["/pvd"]
     Dash --- S["/savings"]
     Dash --- I["/insurance"]
+    Dash --- D["/dividends"]
     Dash --- T["/salary"]
 ```
 
@@ -28,6 +29,7 @@ flowchart LR
 | `/pvd` | Provident Fund รายปี | PVD | `/api/pvd-years` |
 | `/savings` | Savings Accounts | Savings | `/api/savings-accounts` |
 | `/insurance` | Companies + Premium log | Insurance | `/api/insurers`, `/api/insurance-payments` |
+| `/dividends` | Dividend Tracking: สรุปต่อ asset + Payments (เลือกปี) | – (ใหม่) | `/api/dividends`, `/api/dividends/summary` |
 | `/salary` | Salary & Tax (เลือกปี) | Salary & Tax 2026 | `/api/salary-months`, `/api/tax-deductions` |
 
 ## App shell
@@ -131,3 +133,11 @@ Salary & Tax                                   Year [2026]
 ```
 
 - ใน Excel ชีตนี้ผูกกับปี 2026 ใน app เปลี่ยนเป็นตัวเลือกปี (`?year=`) จึงใช้ได้ทุกปี
+
+## 10. Dividend Tracking
+
+![dividends](images/dividends-light.png)
+
+- รวมเงินสดที่ asset จ่ายออกมา: ปันผลหุ้น (Brokerage), ปันผลกองทุน (Funds), ดอกเบี้ย (Savings), เงินคืน (Insurance) PVD ไม่มีเพราะไม่จ่ายเป็นเงินสด
+- ตาราง **By asset** ต่อปี: จำนวนครั้ง, เดือนที่จ่าย (เห็นรอบการจ่าย เช่น รายเดือน หรือ มิ.ย./ธ.ค.), gross, ภาษีหัก ณ ที่จ่าย, net และ yield = net ÷ มูลค่าปัจจุบันของ asset
+- ตาราง **Payments** ใช้ `ResourceTable` ช่อง Source เลือกจาก asset ทุกหน้า (`broker:1`, `fund:2`, ...) เก็บยอดจริงที่ได้รับ ไม่คำนวณดอกเบี้ยให้อัตโนมัติ
