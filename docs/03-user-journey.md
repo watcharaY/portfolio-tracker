@@ -62,8 +62,8 @@ sequenceDiagram
     API->>DB: SELECT * FROM v_brokers
     DB-->>API: rows (+computed)
     API-->>UI: JSON
-    O->>UI: Edit Webull → Current Value = 650,000.00
-    UI->>API: PATCH /api/brokers/1 {current_value: 65000000}
+    O->>UI: Edit Broker A → Current Value = 100,000.00
+    UI->>API: PATCH /api/brokers/1 {current_value: 10000000}
     API->>DB: UPDATE brokers SET ... , updated_at=now
     API-->>UI: row ใหม่จาก v_brokers (P/L อัปเดตแล้ว)
     O->>UI: เปิด Dashboard

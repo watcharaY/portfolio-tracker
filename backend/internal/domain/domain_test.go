@@ -129,8 +129,8 @@ func TestValidation(t *testing.T) {
 		}
 	}
 
-	ok := &Fund{Name: "  SCBSFF ", Category: "Fixed Income", Cost: 1_118, MarketValue: 1_154}
-	if err := ok.Validate(); err != nil || ok.Name != "SCBSFF" {
+	ok := &Fund{Name: "  Fund A ", Category: "Fixed Income", Cost: 1_000, MarketValue: 1_100}
+	if err := ok.Validate(); err != nil || ok.Name != "Fund A" {
 		t.Fatalf("valid fund rejected or not trimmed: %v %q", err, ok.Name)
 	}
 }
