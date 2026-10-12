@@ -57,9 +57,25 @@ make build                     # = npm run build (→ backend/internal/platform/
 | `make db-migrate` | apply migration ที่ค้างอยู่ (`go run ./cmd/server migrate`) โดยไม่ start server |
 | `make db-reset` | **ลบข้อมูลทั้งหมด** (drop schema `public`) แล้ว migrate ใหม่ ถามยืนยันก่อน, `FORCE=1` ข้ามการถาม |
 | `make db-psql` | เปิด psql shell |
+| `make seed-sql` | สร้าง `private/seed-data.sql` จาก Excel (`XLSX=...` เปลี่ยนไฟล์ได้) |
 | `make test` / `lint` | Go tests / go vet + gofmt + tsc |
 | `make vulncheck` | `govulncheck` (Go + stdlib) และ `npm audit` |
 | `make check` | lint + test + vulncheck (เหมือน CI) |
+
+### Import ข้อมูลจาก Excel (ครั้งเดียว)
+
+ย้ายข้อมูลจาก `Portfolio-Tracker.xlsx` เข้า DB บน prod:
+
+```bash
+make seed-sql XLSX=~/Desktop/Portfolio-Tracker.xlsx   # = cd backend && go run ./cmd/xlsx2sql -in <xlsx> -out ../private/seed-data.sql
+./backend/portfolio-tracker migrate                     # schema ต้องมีก่อน
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f private/seed-data.sql
+```
+
+- `private/` อยู่ใน `.gitignore` เพราะไฟล์ SQL มีข้อมูลการเงินจริง ห้าม commit
+- ทั้งไฟล์อยู่ใน transaction เดียว ถ้าตารางข้อมูลใดมีแถวอยู่แล้ว script จะ abort ทันที จึง import ซ้ำไม่ได้
+- ไม่แตะตาราง `users` และ `sessions` ผู้ใช้ `admin` ยัง seed ตัวเองตอน start server ตามเดิม
+- import เสร็จแล้วลบ `private/seed-data.sql` ได้เลย
 
 ## CI
 
@@ -91,6 +107,7 @@ Backup: `docker exec portfolio-tracker-db pg_dump -U portfolio -Fc portfolio > b
 ```
 backend/
   cmd/server/                  entrypoint (`server` | `server migrate`)
+  cmd/xlsx2sql/                Excel → seed SQL แบบใช้ครั้งเดียว (`make seed-sql`)
   internal/domain/             entities, money, validation (ไม่ import อะไรจาก layer อื่น)
   internal/usecase/            auth, generic CRUD, dashboard + ports (interfaces)
   internal/adapter/http/       Fiber routes, DTOs, cookies, error mapping
