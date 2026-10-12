@@ -18,5 +18,26 @@ services:
       timeout: 3s
       retries: 10
 
+  # make app-up: the API and the Caddy-served SPA in the background, against the db above.
+  api:
+    profiles: [app]
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD:-portfolio}@db:5432/${POSTGRES_DB:-portfolio}?sslmode=disable
+      TZ: Asia/Bangkok
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    profiles: [app]
+    build: ./web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:80"
+    depends_on:
+      - api
+
 volumes:
   pgdata:

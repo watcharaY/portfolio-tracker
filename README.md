@@ -21,6 +21,14 @@ make dev-api                   # terminal 1: start DB, migrate, seed, serve :808
 make dev-web                   # terminal 2: Vite :5173 (proxy /api → :8080)
 ```
 
+อยากปล่อยรันเบื้องหลังโดยไม่ต้องเปิด terminal ค้างไว้ (ไม่มี hot reload แก้ code แล้วต้อง `make app-up` ใหม่):
+
+```bash
+make app-up                    # build + start db, api, web (Caddy) แบบ -d → http://localhost:8000
+make app-logs                  # ดู log api + web
+make app-down                  # stop api + web (db ยังรันอยู่)
+```
+
 หรือทำทีละขั้นเองโดยไม่ใช้ make:
 
 ```bash
@@ -67,6 +75,7 @@ make deploy-down                                            # stop (ข้อม
 
 | Target | ทำอะไร |
 |---|---|
+| `make app-up` / `app-down` / `app-logs` | รัน api + web เบื้องหลังผ่าน Docker ที่ :8000 (`APP_PORT=...` เปลี่ยนได้) / stop / ดู log |
 | `make db-up` / `db-down` | start / stop PostgreSQL (ข้อมูลยังอยู่) |
 | `make db-migrate` | apply migration ที่ค้างอยู่ (`go run ./cmd/server migrate`) โดยไม่ start server |
 | `make db-reset` | **ลบข้อมูลทั้งหมด** (drop schema `public`) แล้ว migrate ใหม่ ถามยืนยันก่อน, `FORCE=1` ข้ามการถาม |
