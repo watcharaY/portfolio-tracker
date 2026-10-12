@@ -45,7 +45,18 @@ func NewServer(cfg Config, s Services) *fiber.App {
 		IdleTimeout:  60 * time.Second,
 		ErrorHandler: errorHandler,
 	})
-	app.Use(recover.New(), logger.New(), helmet.New())
+	app.Use(recover.New(), logger.New(), helmet.New(helmet.Config{
+		// The built SPA only loads its own hashed bundles; React's style={} goes through CSSOM, which CSP allows.
+		// Vite inlines small font subsets as data: URIs.
+		ContentSecurityPolicy: "default-src 'self'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+	}))
+	if cfg.CookieSecure {
+		// helmet only sends HSTS when Fiber itself terminates TLS; here TLS ends at the reverse proxy.
+		app.Use(func(c fiber.Ctx) error {
+			c.Set(fiber.HeaderStrictTransportSecurity, "max-age=15552000")
+			return c.Next()
+		})
+	}
 	if cfg.CORSOrigin != "" {
 		app.Use(cors.New(cors.Config{AllowOrigins: []string{cfg.CORSOrigin}, AllowCredentials: true}))
 	}
@@ -56,12 +67,13 @@ func NewServer(cfg Config, s Services) *fiber.App {
 
 	api := app.Group("/api")
 	api.Get("/health", func(c fiber.Ctx) error { return c.JSON(fiber.Map{"ok": true}) })
+	api.Use(requireJSONBody)
 	api.Post("/auth/login", limiter.New(limiter.Config{Max: 10, Expiration: time.Minute}), authH.login)
 
 	pending := api.Group("/auth", requireAuth(true))
 	pending.Get("/me", authH.me)
 	pending.Post("/logout", authH.logout)
-	pending.Post("/password", authH.changePassword)
+	pending.Post("/password", limiter.New(limiter.Config{Max: 10, Expiration: time.Minute}), authH.changePassword)
 
 	priv := api.Group("", requireAuth(false))
 	priv.Get("/dashboard", (&dashboardHandler{svc: s.Dashboard}).summary)
@@ -78,6 +90,19 @@ func NewServer(cfg Config, s Services) *fiber.App {
 
 	mountSPA(app, cfg.WebUI)
 	return app
+}
+
+// requireJSONBody rejects POST/PUT bodies that are not application/json. Browsers
+// cannot send that content type cross-site without a CORS preflight, so this backs
+// up the SameSite=Strict cookie against CSRF.
+func requireJSONBody(c fiber.Ctx) error {
+	switch c.Method() {
+	case fiber.MethodPost, fiber.MethodPut:
+		if !strings.HasPrefix(c.Get(fiber.HeaderContentType), fiber.MIMEApplicationJSON) {
+			return fiber.NewError(fiber.StatusUnsupportedMediaType, "Content-Type must be application/json")
+		}
+	}
+	return c.Next()
 }
 
 func mountSPA(app *fiber.App, webUI fs.FS) {

@@ -69,3 +69,35 @@ func TestDecodeJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestRequireJSONBody(t *testing.T) {
+	app := fiber.New(fiber.Config{ErrorHandler: errorHandler})
+	app.Use(requireJSONBody)
+	app.All("/", func(c fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
+
+	cases := []struct {
+		method, contentType string
+		status              int
+	}{
+		{"POST", "application/json", 204},
+		{"PUT", "application/json; charset=utf-8", 204},
+		{"POST", "text/plain", 415},
+		{"POST", "application/x-www-form-urlencoded", 415},
+		{"PUT", "", 415},
+		{"GET", "", 204},
+		{"DELETE", "", 204},
+	}
+	for _, c := range cases {
+		req := httptest.NewRequest(c.method, "/", nil)
+		if c.contentType != "" {
+			req.Header.Set("Content-Type", c.contentType)
+		}
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != c.status {
+			t.Errorf("%s %q: got %d, want %d", c.method, c.contentType, resp.StatusCode, c.status)
+		}
+	}
+}

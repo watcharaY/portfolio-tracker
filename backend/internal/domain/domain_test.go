@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -135,7 +136,7 @@ func TestValidation(t *testing.T) {
 }
 
 func TestValidateNewPassword(t *testing.T) {
-	for _, pw := range []string{"short", "admin", "Admin123", "ADMIN123"} {
+	for _, pw := range []string{"short", "admin", "Admin123", "ADMIN123", strings.Repeat("x", MaxPasswordBytes+1)} {
 		if ValidateNewPassword("admin123", pw) == nil {
 			t.Errorf("%q should be rejected", pw)
 		}
