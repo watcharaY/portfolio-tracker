@@ -56,7 +56,7 @@ jobs:
       - run: cd web && npm ci
       - run: make typecheck
       - run: make build-web
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: webui-dist
           path: backend/internal/platform/webui/dist
@@ -78,7 +78,7 @@ jobs:
           path: backend/internal/platform/webui/dist
       - name: Build with the SPA embedded
         run: cd backend && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o portfolio-tracker ./cmd/server
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: portfolio-tracker-linux-amd64
           path: backend/portfolio-tracker
