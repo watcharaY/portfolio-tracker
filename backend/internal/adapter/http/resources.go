@@ -192,11 +192,9 @@ func pvdResource(svc *usecase.PVDService) resource[*domain.PVDYear, domain.PVDYe
 		filter: noFilter,
 		present: func(p domain.PVDYear) any {
 			return pvdResponse{
-				ID: p.ID,
-				pvdRequest: pvdRequest{
-					Year: p.Year, SelfContribution: p.SelfContribution, CompanyContribution: p.CompanyContribution,
-					SelfProfit: p.SelfProfit, CompanyProfit: p.CompanyProfit, FundAllocation: p.FundAllocation,
-				},
+				ID:   p.ID,
+				Year: p.Year, SelfContribution: p.SelfContribution, CompanyContribution: p.CompanyContribution,
+				SelfProfit: p.SelfProfit, CompanyProfit: p.CompanyProfit, FundAllocation: p.FundAllocation,
 				TotalContribution: p.TotalContribution(), TotalProfit: p.TotalProfit(),
 				Value: p.Value(), ReturnPct: p.ReturnPercent(),
 				timestamps: timestamps{p.CreatedAt, p.UpdatedAt},
@@ -228,8 +226,8 @@ func savingsResource(svc *usecase.SavingsService) resource[*domain.SavingsAccoun
 		filter: noFilter,
 		present: func(s domain.SavingsAccount) any {
 			return savingsResponse{
-				ID:              s.ID,
-				savingsRequest:  savingsRequest{Bank: s.Bank, Balance: s.Balance, InterestBP: s.InterestRate, Note: s.Note},
+				ID:   s.ID,
+				Bank: s.Bank, Balance: s.Balance, InterestBP: s.InterestRate, Note: s.Note,
 				InterestPerYear: s.InterestPerYear(),
 				timestamps:      timestamps{s.CreatedAt, s.UpdatedAt},
 			}
@@ -259,7 +257,7 @@ func insurerResource(svc *usecase.InsurerService) resource[*domain.Insurer, doma
 		filter: noFilter,
 		present: func(i domain.InsurerSummary) any {
 			return insurerResponse{
-				ID: i.ID, insurerRequest: insurerRequest{Company: i.Company, Note: i.Note},
+				ID: i.ID, Company: i.Company, Note: i.Note,
 				Payments: i.Payments, TotalPaid: i.TotalPaid,
 				timestamps: timestamps{i.CreatedAt, i.UpdatedAt},
 			}
@@ -298,9 +296,9 @@ func paymentResource(svc *usecase.InsurancePaymentService) resource[*domain.Insu
 		},
 		present: func(p domain.InsurancePayment) any {
 			return paymentResponse{
-				ID:             p.ID,
-				paymentRequest: paymentRequest{InsurerID: p.InsurerID, Year: p.Year, Premium: p.Premium, Note: p.Note},
-				Company:        p.Company, PaymentNo: p.PaymentNo,
+				ID:        p.ID,
+				InsurerID: p.InsurerID, Year: p.Year, Premium: p.Premium, Note: p.Note,
+				Company: p.Company, PaymentNo: p.PaymentNo,
 				timestamps: timestamps{p.CreatedAt, p.UpdatedAt},
 			}
 		},
@@ -335,11 +333,9 @@ func salaryResource(svc *usecase.SalaryService) resource[*domain.SalaryMonth, do
 		filter: yearFilter,
 		present: func(s domain.SalaryMonth) any {
 			return salaryResponse{
-				ID: s.ID,
-				salaryRequest: salaryRequest{
-					Year: s.Year, Month: s.Month, Salary: s.Salary, Bonus: s.Bonus,
-					WithholdingTax: s.WithholdingTax, PVD: s.PVD, SSO: s.SSO,
-				},
+				ID:   s.ID,
+				Year: s.Year, Month: s.Month, Salary: s.Salary, Bonus: s.Bonus,
+				WithholdingTax: s.WithholdingTax, PVD: s.PVD, SSO: s.SSO,
 				timestamps: timestamps{s.CreatedAt, s.UpdatedAt},
 			}
 		},
@@ -367,9 +363,9 @@ func deductionResource(svc *usecase.TaxDeductionService) resource[*domain.TaxDed
 		filter: yearFilter,
 		present: func(d domain.TaxDeduction) any {
 			return deductionResponse{
-				ID:               d.ID,
-				deductionRequest: deductionRequest{Year: d.Year, Item: d.Item, Amount: d.Amount},
-				timestamps:       timestamps{d.CreatedAt, d.UpdatedAt},
+				ID:   d.ID,
+				Year: d.Year, Item: d.Item, Amount: d.Amount,
+				timestamps: timestamps{d.CreatedAt, d.UpdatedAt},
 			}
 		},
 	}

@@ -59,8 +59,8 @@ func TestDecodeJSON(t *testing.T) {
 	if _, err := decodeJSON[req]([]byte(`{"name":"a","amount":100}`)); err != nil {
 		t.Fatalf("valid body rejected: %v", err)
 	}
-	var ve *domain.ValidationError
-	if _, err := decodeJSON[req]([]byte(`{"amount":1.5}`)); !errors.As(err, &ve) || ve.Field != "amount" {
+	_, err := decodeJSON[req]([]byte(`{"amount":1.5}`))
+	if ve, ok := errors.AsType[*domain.ValidationError](err); !ok || ve.Field != "amount" {
 		t.Errorf("fractional money: got %v", err)
 	}
 	for _, body := range []string{`{"name":"a","extra":1}`, `{"name":"a"} {}`, `not json`} {

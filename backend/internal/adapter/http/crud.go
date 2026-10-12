@@ -21,7 +21,7 @@ type resource[W usecase.Validatable, R any, F any] struct {
 	present func(R) any
 }
 
-func mount[W usecase.Validatable, R any, F any](r fiber.Router, path string, res resource[W, R, F]) {
+func (res resource[W, R, F]) mount(r fiber.Router, path string) {
 	r.Get(path, func(c fiber.Ctx) error {
 		f, err := res.filter(c)
 		if err != nil {
@@ -95,8 +95,7 @@ func decodeJSON[T any](body []byte) (T, error) {
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&v); err != nil {
-		var typeErr *json.UnmarshalTypeError
-		if errors.As(err, &typeErr) {
+		if typeErr, ok := errors.AsType[*json.UnmarshalTypeError](err); ok {
 			return v, &domain.ValidationError{Field: typeErr.Field, Message: "must be " + jsonKind(typeErr.Type)}
 		}
 		return v, badRequest("invalid JSON body: " + err.Error())

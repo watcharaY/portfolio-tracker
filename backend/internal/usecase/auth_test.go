@@ -112,7 +112,7 @@ func newEnv(t *testing.T) *env {
 
 func (e *env) login(t *testing.T, user, pw string) usecase.LoginResult {
 	t.Helper()
-	res, err := e.svc.Login(context.Background(), usecase.LoginInput{Username: user, Password: pw})
+	res, err := e.svc.Login(t.Context(), usecase.LoginInput{Username: user, Password: pw})
 	if err != nil {
 		t.Fatalf("login %s: %v", user, err)
 	}
@@ -121,7 +121,7 @@ func (e *env) login(t *testing.T, user, pw string) usecase.LoginResult {
 
 func TestEnsureDefaultAdmin_SeedsOnce(t *testing.T) {
 	e := newEnv(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if seeded, err := e.svc.EnsureDefaultAdmin(ctx); err != nil || !seeded {
 		t.Fatalf("first call: seeded=%v err=%v", seeded, err)
 	}
@@ -135,7 +135,7 @@ func TestEnsureDefaultAdmin_SeedsOnce(t *testing.T) {
 
 func TestLogin(t *testing.T) {
 	e := newEnv(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	e.svc.EnsureDefaultAdmin(ctx)
 
 	for _, in := range []usecase.LoginInput{{Username: "admin", Password: "nope"}, {Username: "ghost", Password: "admin"}} {
@@ -159,7 +159,7 @@ func TestLogin(t *testing.T) {
 
 func TestAuthenticate_ExpiredAndLoggedOut(t *testing.T) {
 	e := newEnv(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	e.svc.EnsureDefaultAdmin(ctx)
 
 	res := e.login(t, "admin", "admin")
@@ -180,7 +180,7 @@ func TestAuthenticate_ExpiredAndLoggedOut(t *testing.T) {
 
 func TestChangePassword_RevokesOtherSessions(t *testing.T) {
 	e := newEnv(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	e.svc.EnsureDefaultAdmin(ctx)
 
 	laptop := e.login(t, "admin", "admin")
@@ -191,10 +191,10 @@ func TestChangePassword_RevokesOtherSessions(t *testing.T) {
 	}); err == nil {
 		t.Fatal("wrong current password must fail")
 	}
-	var ve *domain.ValidationError
-	if _, err := e.svc.ChangePassword(ctx, usecase.ChangePasswordInput{
+	_, err := e.svc.ChangePassword(ctx, usecase.ChangePasswordInput{
 		UserID: 1, CurrentPassword: "admin", NewPassword: "admin", CurrentToken: laptop.Token,
-	}); !errors.As(err, &ve) {
+	})
+	if _, ok := errors.AsType[*domain.ValidationError](err); !ok {
 		t.Fatalf("weak password: want ValidationError, got %v", err)
 	}
 

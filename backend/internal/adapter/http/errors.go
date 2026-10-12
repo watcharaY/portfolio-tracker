@@ -16,14 +16,10 @@ type errorBody struct {
 }
 
 func errorHandler(c fiber.Ctx, err error) error {
-	var (
-		fe *fiber.Error
-		ve *domain.ValidationError
-	)
-	switch {
-	case errors.As(err, &ve):
+	if ve, ok := errors.AsType[*domain.ValidationError](err); ok {
 		return c.Status(fiber.StatusBadRequest).JSON(errorBody{Error: ve.Error(), Field: ve.Field})
-	case errors.As(err, &fe):
+	}
+	if fe, ok := errors.AsType[*fiber.Error](err); ok {
 		return c.Status(fe.Code).JSON(errorBody{Error: fe.Message})
 	}
 

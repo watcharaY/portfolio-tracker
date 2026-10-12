@@ -2,9 +2,9 @@ package app
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -150,7 +150,7 @@ func newAPI(t *testing.T) (*apiClient, e2eExpected) {
 	if url == "" {
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	db, err := postgres.Connect(ctx, url)
 	if err != nil {
 		t.Fatal(err)
@@ -383,9 +383,7 @@ func TestAPI_ResourceCRUD(t *testing.T) {
 
 			c.expect(http.MethodPost, rc.path, rc.invalid, http.StatusBadRequest)
 			withUnknown := map[string]any{"unknown_field": 1}
-			for k, v := range rc.create {
-				withUnknown[k] = v
-			}
+			maps.Copy(withUnknown, rc.create)
 			c.expect(http.MethodPost, rc.path, withUnknown, http.StatusBadRequest)
 
 			created := c.expect(http.MethodPost, rc.path, rc.create, http.StatusCreated).object(t)

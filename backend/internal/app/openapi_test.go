@@ -71,12 +71,12 @@ func checkContract(t *testing.T, method, path, contentType string, reqBody []byt
 		Options: &openapi3filter.Options{AuthenticationFunc: openapi3filter.NoopAuthenticationFunc},
 	}
 	if status < 300 {
-		if err := openapi3filter.ValidateRequest(context.Background(), input); err != nil {
+		if err := openapi3filter.ValidateRequest(t.Context(), input); err != nil {
 			t.Errorf("%s %s: the server accepted a request openapi.yaml rejects: %v", method, path, err)
 		}
 	}
 	isJSON := strings.HasPrefix(header.Get("Content-Type"), "application/json")
-	err = openapi3filter.ValidateResponse(context.Background(), &openapi3filter.ResponseValidationInput{
+	err = openapi3filter.ValidateResponse(t.Context(), &openapi3filter.ResponseValidationInput{
 		RequestValidationInput: input,
 		Status:                 status,
 		Header:                 header,

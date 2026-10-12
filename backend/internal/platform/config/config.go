@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"os"
 	"strconv"
 	"strings"
@@ -42,7 +43,7 @@ func Load() Config {
 
 func splitList(s string) []string {
 	var out []string
-	for _, p := range strings.Split(s, ",") {
+	for p := range strings.SplitSeq(s, ",") {
 		if p = strings.TrimSpace(p); p != "" {
 			out = append(out, p)
 		}
@@ -58,8 +59,5 @@ func envInt(key string, def int) int {
 }
 
 func env(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
+	return cmp.Or(os.Getenv(key), def)
 }

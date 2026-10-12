@@ -16,9 +16,9 @@ func approx(t *testing.T, got *float64, want float64) {
 
 func TestBrokerSummary_NetCapitalAndPL(t *testing.T) {
 	b := BrokerSummary{
-		Broker:      Broker{CurrentValue: 120_000_000},
-		Deposits:    100_000_000 + 20_000_000,
-		Withdrawals: 10_000_000,
+		CurrentValue: 120_000_000,
+		Deposits:     100_000_000 + 20_000_000,
+		Withdrawals:  10_000_000,
 	}
 	if got, want := b.NetCapital(), Money(110_000_000); got != want {
 		t.Fatalf("net capital = %d, want %d", got, want)
@@ -30,7 +30,7 @@ func TestBrokerSummary_NetCapitalAndPL(t *testing.T) {
 }
 
 func TestBrokerSummary_NoCapitalHasNoPercent(t *testing.T) {
-	b := BrokerSummary{Broker: Broker{CurrentValue: 100}, Withdrawals: 50}
+	b := BrokerSummary{CurrentValue: 100, Withdrawals: 50}
 	if b.PLPercent() != nil {
 		t.Fatal("P/L % must be empty when net capital <= 0")
 	}
@@ -64,7 +64,7 @@ func TestPVDYear(t *testing.T) {
 
 func TestSummarize(t *testing.T) {
 	s := Summarize(Holdings{
-		Brokers:   []BrokerSummary{{Broker: Broker{CurrentValue: 1_100}, Deposits: 1_000}},
+		Brokers:   []BrokerSummary{{CurrentValue: 1_100, Deposits: 1_000}},
 		Funds:     []Fund{{Cost: 400, MarketValue: 500}},
 		PVD:       []PVDYear{{SelfContribution: 200, SelfProfit: 50}},
 		Savings:   []SavingsAccount{{Balance: 10_000, InterestRate: 250}},
@@ -123,8 +123,8 @@ func TestValidation(t *testing.T) {
 		"deduction without item":    &TaxDeduction{Year: 2026},
 	}
 	for name, e := range cases {
-		var ve *ValidationError
-		if err := e.Validate(); !errors.As(err, &ve) {
+		err := e.Validate()
+		if _, ok := errors.AsType[*ValidationError](err); !ok {
 			t.Errorf("%s: want ValidationError, got %v", name, err)
 		}
 	}
@@ -159,8 +159,7 @@ func TestValidateNewPassword(t *testing.T) {
 	}
 	for name, c := range rejected {
 		err := ValidateNewPassword("somchai", c.password)
-		var ve *ValidationError
-		if !errors.As(err, &ve) || ve.Field != "newPassword" || !strings.Contains(ve.Error(), c.reason) {
+		if ve, ok := errors.AsType[*ValidationError](err); !ok || ve.Field != "newPassword" || !strings.Contains(ve.Error(), c.reason) {
 			t.Errorf("%s: %q gave %v, want a newPassword error containing %q", name, c.password, err, c.reason)
 		}
 	}

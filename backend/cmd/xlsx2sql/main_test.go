@@ -4,7 +4,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -27,11 +28,7 @@ func buildXLSX(t *testing.T, sheets map[string]map[string]any) *bytes.Reader {
 			t.Fatal(err)
 		}
 	}
-	names := make([]string, 0, len(sheets))
-	for n := range sheets {
-		names = append(names, n)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(sheets))
 
 	var shared []string
 	var book, rels strings.Builder

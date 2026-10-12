@@ -23,7 +23,7 @@ var commonPasswordList string
 // refused when it is a listed one dressed up: P@ssw0rd123! normalizes to password.
 var commonPasswords = sync.OnceValue(func() map[string]struct{} {
 	set := map[string]struct{}{}
-	for _, line := range strings.Split(commonPasswordList, "\n") {
+	for line := range strings.SplitSeq(commonPasswordList, "\n") {
 		for _, n := range normalizedForms(strings.TrimSpace(line)) {
 			set[n] = struct{}{}
 		}
