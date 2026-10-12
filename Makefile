@@ -119,3 +119,16 @@ run: build build-web db-up ## Build both and run the binary, serving web/dist to
 
 clean: ## Remove build output
 	rm -rf $(BIN) web/dist
+
+DEPLOY := docker compose -f deploy/docker-compose.yml
+
+.PHONY: docker-build deploy-up deploy-down
+docker-build: ## Build the api and web Docker images
+	docker build -t portfolio-tracker-api backend
+	docker build -t portfolio-tracker-web web
+
+deploy-up: ## Build and start db, api and web from deploy/ (needs deploy/.env)
+	$(DEPLOY) up -d --build --wait
+
+deploy-down: ## Stop the deploy stack (data is kept)
+	$(DEPLOY) down
