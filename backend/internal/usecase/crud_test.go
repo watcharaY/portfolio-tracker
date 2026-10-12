@@ -60,15 +60,15 @@ func TestCRUD_ValidatesBeforePersisting(t *testing.T) {
 		t.Fatal("invalid entity must not reach the repository")
 	}
 
-	created, err := svc.Create(ctx, &domain.Fund{Name: "KT-JEPQ", Category: "Equity", Cost: 10_000, MarketValue: 10_483})
+	created, err := svc.Create(ctx, &domain.Fund{Name: "Fund B", Category: "Equity", Cost: 10_000, MarketValue: 10_500})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if created.ID == 0 || created.UnrealisedPL() != 483 {
+	if created.ID == 0 || created.UnrealisedPL() != 500 {
 		t.Fatalf("created = %+v", created)
 	}
 
-	updated, err := svc.Update(ctx, created.ID, &domain.Fund{Name: "KT-JEPQ", Category: "Equity", Cost: 10_000, MarketValue: 9_000})
+	updated, err := svc.Update(ctx, created.ID, &domain.Fund{Name: "Fund B", Category: "Equity", Cost: 10_000, MarketValue: 9_000})
 	if err != nil || updated.UnrealisedPL() != -1_000 {
 		t.Fatalf("update: %+v %v", updated, err)
 	}
