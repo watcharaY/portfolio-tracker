@@ -1,7 +1,7 @@
 # 02 · Database ER
 
 PostgreSQL 18 (รันผ่าน `docker-compose.yml`) backend migrate schema อัตโนมัติตอน start
-schema อยู่ที่ [`backend/internal/adapter/postgres/migrations/001_init.sql`](../backend/internal/adapter/postgres/migrations/001_init.sql)
+schema อยู่ที่ [`backend/internal/adapter/postgres/migrations/`](../backend/internal/adapter/postgres/migrations/) (ไฟล์แรกคือ `20261012000000_init.sql`)
 
 ## Conventions
 
@@ -165,6 +165,8 @@ CREATE TABLE portfolio_snapshots (
 
 ## Migration
 
-- ตั้งชื่อไฟล์เป็น `NNN_description.sql` ในโฟลเดอร์ `backend/internal/adapter/postgres/migrations/` (ไฟล์ถูก embed เข้า binary)
-- เก็บ migration ที่ apply แล้วในตาราง `schema_migrations` แต่ละไฟล์รันใน transaction เดียว (DDL ของ Postgres เป็น transactional) และมี `pg_advisory_xact_lock` กันกรณีหลาย instance start พร้อมกัน
+- สร้างไฟล์ด้วย `make migration name=add_fund_tags` จะได้ `YYYYMMDDHHMMSS_add_fund_tags.sql` (เวลา UTC) ในโฟลเดอร์ `backend/internal/adapter/postgres/migrations/` (ไฟล์ถูก embed เข้า binary) ชื่อผิดรูปแบบหรือ timestamp ซ้ำ `go test` จะ fail
+- เก็บ version (timestamp 14 หลัก, `BIGINT`) ที่ apply แล้วในตาราง `schema_migrations` DB ที่ migrate ด้วยรูปแบบเก่า `NNN_*.sql` จะ start ไม่ได้ ให้รัน `make db-reset`
+- แต่ละไฟล์รันใน transaction เดียว (DDL ของ Postgres เป็น transactional) และมี `pg_advisory_xact_lock` กันกรณีหลาย instance start พร้อมกัน
 - **ห้ามแก้ไฟล์ migration ที่ apply ไปแล้ว** ถ้าจะเปลี่ยน schema ให้เพิ่มไฟล์ใหม่
+- SQL ของ repository อยู่ใน `backend/internal/adapter/postgres/queries/*.sql` sqlc อ่าน migrations เป็น schema แล้ว generate Go ลง `internal/gen` หลังแก้ migration หรือ query ให้รัน `make sqlc` แล้ว commit ไฟล์ใน `internal/gen` ด้วย (CI รัน `make sqlc-check`)

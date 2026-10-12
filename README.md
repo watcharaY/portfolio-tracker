@@ -58,7 +58,9 @@ make build                     # = npm run build (→ backend/internal/platform/
 | `make db-reset` | **ลบข้อมูลทั้งหมด** (drop schema `public`) แล้ว migrate ใหม่ ถามยืนยันก่อน, `FORCE=1` ข้ามการถาม |
 | `make db-psql` | เปิด psql shell |
 | `make seed-sql` | สร้าง `private/seed-data.sql` จาก Excel (`XLSX=...` เปลี่ยนไฟล์ได้) |
-| `make test` / `lint` | Go tests / go vet + gofmt + tsc |
+| `make migration name=x` | สร้างไฟล์ migration เปล่า `YYYYMMDDHHMMSS_x.sql` (เวลา UTC) |
+| `make sqlc` / `sqlc-check` | generate Go จาก `queries/*.sql` ด้วย sqlc (ผ่าน Docker) / เช็คว่าไฟล์ที่ commit ตรงกับที่ generate ใหม่ |
+| `make test` / `lint` | Go tests / sqlc-check + go vet + gofmt + tsc |
 | `make vulncheck` | `govulncheck` (Go + stdlib) และ `npm audit` |
 | `make check` | lint + test + vulncheck (เหมือน CI) |
 
@@ -81,7 +83,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f private/seed-data.sql
 
 `.github/workflows/ci.yml` รันทุก push เข้า `main`, ทุก PR, ทุกวันจันทร์ 08:00 (เผื่อมีช่องโหว่ใหม่) และกดรันเองได้:
 
-- **backend**: `make vet`, `make test GOTESTFLAGS=-race` และ migrate บน Postgres 18 ที่สร้างใหม่
+- **backend**: `make sqlc-check`, `make vet`, `make test GOTESTFLAGS=-race` และ migrate บน Postgres 18 ที่สร้างใหม่
 - **web**: `npm ci`, typecheck, build
 - **build**: build binary ไฟล์เดียวแบบ embed SPA แล้วเก็บเป็น artifact 7 วัน
 - **vulncheck**: `make vulncheck`
@@ -111,7 +113,7 @@ backend/
   internal/domain/             entities, money, validation (ไม่ import อะไรจาก layer อื่น)
   internal/usecase/            auth, generic CRUD, dashboard + ports (interfaces)
   internal/adapter/http/       Fiber routes, DTOs, cookies, error mapping
-  internal/adapter/postgres/   repositories, migrations (embedded)
+  internal/adapter/postgres/   repositories, migrations (embedded), queries/*.sql → internal/gen (sqlc)
   internal/platform/           config, security (bcrypt, tokens), webui (embedded SPA)
   internal/app/                composition root
 web/
@@ -133,7 +135,8 @@ docs/                    design docs
 
 - เงินเก็บเป็น `BIGINT` และส่งผ่าน API เป็น **integer satang** (`100` = ฿1.00) ส่วนดอกเบี้ยเป็น **basis points** (`250` = 2.5%)
 - ค่าที่คำนวณได้อยู่ใน SQL view `v_*` ไม่เก็บซ้ำลงตาราง
-- เปลี่ยน schema ด้วยการเพิ่มไฟล์ `backend/internal/adapter/postgres/migrations/NNN_*.sql` ห้ามแก้ไฟล์เดิม
+- เปลี่ยน schema ด้วย `make migration name=x` แล้วแก้ไฟล์ใหม่ ห้ามแก้ไฟล์เดิม จากนั้น `make db-migrate` และ `make sqlc`
+- เพิ่มหรือแก้ SQL ใน `backend/internal/adapter/postgres/queries/*.sql` แล้วรัน `make sqlc` และ commit `internal/gen` ไปด้วย
 
 ## Security
 
