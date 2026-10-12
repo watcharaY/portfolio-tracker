@@ -6,7 +6,7 @@ Web app ส่วนตัว (ใช้คนเดียว) สำหรั�
 - **Backend**: Go 1.26+ · [Fiber v3](https://gofiber.io) · PostgreSQL 18 ([pgx v5](https://github.com/jackc/pgx))
 - **Frontend**: React 19 · Vite 5 · TypeScript · react-router
 - **Auth**: username/password (bcrypt) + server-side session cookie (HttpOnly, SameSite=Strict)
-- **Deploy**: frontend build แล้ว embed เข้า Go binary ได้ไฟล์ executable ไฟล์เดียว
+- **Deploy**: frontend กับ backend build และ deploy แยกกัน: Caddy serve SPA และ proxy `/api/*` ไปที่ Go API บน origin เดียวกัน
 
 ![dashboard](docs/images/dashboard-light.png)
 
@@ -40,12 +40,26 @@ npm run dev                    # http://localhost:5173
 
 Login ด้วย **`admin` / `admin`** แล้วระบบจะบังคับให้ตั้งรหัสผ่านใหม่ก่อนใช้งาน
 
-### Production build (ไฟล์เดียว)
+### Production build
 
 ```bash
-make build                     # = npm run build (→ backend/internal/platform/webui/dist) + go build
-./backend/portfolio-tracker    # serve ทั้ง SPA และ API ที่ :8080
+make build-web                 # SPA → web/dist
+make build                     # API binary → backend/portfolio-tracker (serve แค่ /api)
+make run                       # build ทั้งคู่ แล้วรัน binary ด้วย WEB_DIR=../web/dist ที่ :8080
 ```
+
+### Deploy (Docker)
+
+`deploy/docker-compose.yml` รัน 3 service: `db` (Postgres ไม่เปิด port ออกนอก), `api` (`backend/Dockerfile`) และ `web` (`web/Dockerfile`: Caddy serve SPA และ proxy `/api/*` ไปที่ `api:8080`) แต่ละ image build แยกกันได้ ถ้า API ล่ม หน้าเว็บยังโหลดได้ มีแค่ `/api` ที่ตอบ 502
+
+```bash
+cp deploy/.env.example deploy/.env                          # ตั้งรหัสผ่าน DB และ SITE_ADDRESS
+make deploy-up                                              # build + start db, api, web
+docker compose -f deploy/docker-compose.yml run --rm api migrate   # apply migration (api ก็ migrate เองตอน start)
+make deploy-down                                            # stop (ข้อมูลยังอยู่ใน volume)
+```
+
+ใช้ domain จริงใน `SITE_ADDRESS` แล้ว Caddy จะออก HTTPS certificate ให้เอง ต้องตั้ง `COOKIE_SECURE=true` ด้วย
 
 ### Make targets
 
@@ -63,6 +77,9 @@ make build                     # = npm run build (→ backend/internal/platform/
 | `make test` / `lint` | Go tests / sqlc-check + go vet + gofmt + tsc |
 | `make vulncheck` | `govulncheck` (Go + stdlib) และ `npm audit` |
 | `make check` | lint + test + vulncheck (เหมือน CI) |
+| `make build-web` / `build` / `run` | build SPA / build API binary / รัน binary พร้อม serve `web/dist` |
+| `make docker-build` | build image ของ api และ web |
+| `make deploy-up` / `deploy-down` | start / stop stack ใน `deploy/` |
 
 ### Import ข้อมูลจาก Excel (ครั้งเดียว)
 
@@ -85,7 +102,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f private/seed-data.sql
 
 - **backend**: `make sqlc-check`, `make vet`, `make test GOTESTFLAGS=-race` และ migrate บน Postgres 18 ที่สร้างใหม่
 - **web**: `npm ci`, typecheck, build
-- **build**: build binary ไฟล์เดียวแบบ embed SPA แล้วเก็บเป็น artifact 7 วัน
+- **Docker images**: build `backend/Dockerfile` และ `web/Dockerfile` (ไม่ push)
 - **vulncheck**: `make vulncheck`
 
 `.github/dependabot.yml` เปิด PR อัปเดต Go modules, npm และ GitHub Actions ให้อัตโนมัติ
@@ -99,6 +116,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f private/seed-data.sql
 | `SESSION_TTL` | `168h` | อายุ session |
 | `COOKIE_SECURE` | `false` | ตั้งเป็น `true` เมื่อ serve ผ่าน HTTPS |
 | `CORS_ORIGIN` | – | ใช้เฉพาะตอน frontend อยู่คนละ origin |
+| `WEB_DIR` | – | ถ้าตั้ง จะ serve SPA ที่ build แล้วจากโฟลเดอร์นี้ด้วย (fallback → `index.html`) ถ้าไม่ตั้ง serve แค่ `/api` |
 
 ลืมรหัสผ่าน: `docker exec -it portfolio-tracker-db psql -U portfolio -c "DELETE FROM users;"` แล้ว restart backend ระบบจะ seed `admin/admin` ให้ใหม่
 
@@ -114,11 +132,14 @@ backend/
   internal/usecase/            auth, generic CRUD, dashboard + ports (interfaces)
   internal/adapter/http/       Fiber routes, DTOs, cookies, error mapping
   internal/adapter/postgres/   repositories, migrations (embedded), queries/*.sql → internal/gen (sqlc)
-  internal/platform/           config, security (bcrypt, tokens), webui (embedded SPA)
+  internal/platform/           config, security (bcrypt, tokens)
   internal/app/                composition root
+  Dockerfile                   API image (distroless)
 web/
+  Caddyfile, Dockerfile  web image: SPA + proxy /api
   src/components/        Layout, ResourceTable (generic table + inline edit)
   src/pages/             one page per spreadsheet sheet
+deploy/                  docker-compose.yml + .env.example สำหรับ deploy
 docs/                    design docs
 ```
 
