@@ -28,6 +28,11 @@ export function resetDB() {
   return withDB((c) => c.query(seed))
 }
 
+// Runs SQL against the e2e database, for states the seed does not cover.
+export function sql(query: string) {
+  return withDB((c) => c.query(query))
+}
+
 // Signs a context in by writing a session row, the same shape the API stores:
 // the cookie holds a random token and the table holds its SHA-256. This skips the
 // login form, which only auth.spec.ts exercises, and its 10/min rate limit.
