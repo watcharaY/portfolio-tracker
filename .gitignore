@@ -1,6 +1,7 @@
 *.dump
 *.sql.gz
 backups/
+/private/
 *.xlsx
 *.xls
 *.csv
