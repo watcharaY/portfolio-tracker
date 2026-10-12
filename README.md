@@ -267,6 +267,8 @@ make deploy-down                                            # stop (ข้อม
 | `make migration name=x` | สร้างไฟล์ migration เปล่า `YYYYMMDDHHMMSS_x.sql` (เวลา UTC) |
 | `make sqlc` / `sqlc-check` | generate Go จาก `queries/*.sql` ด้วย sqlc (ผ่าน Docker) / เช็คว่าไฟล์ที่ commit ตรงกับที่ generate ใหม่ |
 | `make test` / `lint` | Go tests / sqlc-check + go vet + gofmt + tsc |
+| `make e2e` | รัน Playwright ทุก spec ใน `e2e/tests` บน stack แยก (web :8100, DB ในหน่วยความจำ) ด้วยข้อมูลสมมติ แล้วปิด stack ให้ (Windows ใช้ Edge ที่ติดตั้งอยู่) |
+| `make e2e-ui` / `e2e-down` | เปิด Playwright UI mode ไว้ดูทีละ step / ปิด stack |
 | `make vulncheck` | `govulncheck` (Go + stdlib) และ `npm audit` |
 | `make check` | lint + test + vulncheck (เหมือน CI) |
 | `make build-web` / `build` / `run` | build SPA / build API binary / รัน binary พร้อม serve `web/dist` |
@@ -297,6 +299,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f private/seed-data.sql
 - **backend**: `make sqlc-check`, `make vet`, `make test GOTESTFLAGS=-race` และ migrate บน Postgres 18 ที่สร้างใหม่
 - **web**: `npm ci`, typecheck, build
 - **Docker images**: build `backend/Dockerfile` และ `web/Dockerfile` (ไม่ push)
+- **E2E**: build image `api` + `web` แล้วรัน Playwright (Chromium) บนข้อมูลสมมติ ถ้าพังจะแนบ report และ trace เป็น artifact
 - **vulncheck**: `make vulncheck`
 
 `.github/dependabot.yml` เปิด PR อัปเดต Go modules, npm และ GitHub Actions ให้อัตโนมัติ

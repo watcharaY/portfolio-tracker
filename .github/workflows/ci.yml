@@ -68,6 +68,30 @@ jobs:
       - run: docker build -t portfolio-tracker-api backend
       - run: docker build -t portfolio-tracker-web web
 
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - run: docker compose -f e2e/docker-compose.yml up -d --build --wait
+      - run: cd e2e && npm ci && npx playwright install --with-deps chromium
+      - run: cd e2e && npx playwright test
+      - if: failure()
+        run: docker compose -f e2e/docker-compose.yml logs api web
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7
+
   vulncheck:
     name: Vulnerability scan
     runs-on: ubuntu-latest
@@ -83,4 +107,5 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: cd web && npm ci
+      - run: cd e2e && npm ci
       - run: make vulncheck
