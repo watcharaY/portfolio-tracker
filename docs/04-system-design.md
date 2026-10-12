@@ -31,7 +31,7 @@ flowchart LR
     AUTH --> DB
 ```
 
-- **Production**: `npm run build` เขียนไฟล์ลง `backend/internal/webui/dist` แล้ว `go build` embed เข้า binary ได้ไฟล์ `.exe` ไฟล์เดียวที่ serve ทั้ง SPA และ API บน origin เดียวกัน (ไม่ต้องตั้ง CORS)
+- **Production**: `npm run build` เขียนไฟล์ลง `backend/internal/platform/webui/dist` แล้ว `go build` embed เข้า binary ได้ไฟล์ `.exe` ไฟล์เดียวที่ serve ทั้ง SPA และ API บน origin เดียวกัน (ไม่ต้องตั้ง CORS)
 - **Dev**: Vite (:5173) proxy `/api` ไปที่ Go (:8080) ได้ HMR ทั้งฝั่ง frontend
 
 ## Repo layout
@@ -39,14 +39,18 @@ flowchart LR
 ```
 portfolio-tracker/
 ├─ backend/
-│  ├─ cmd/server/main.go           # wiring, config, graceful shutdown
+│  ├─ cmd/server/main.go           # `server` (serve) | `server migrate`, graceful shutdown
 │  └─ internal/
-│     ├─ config/                   # env vars
-│     ├─ db/                       # connect (pgx), migrate (schema_migrations), seed admin
-│     │  └─ migrations/001_init.sql
-│     ├─ auth/                     # login, sessions, middleware, change password
-│     ├─ api/                      # router, resources (generic CRUD), dashboard
-│     └─ webui/                    # go:embed of web build
+│     ├─ domain/                   # entities, money, validation, domain errors
+│     ├─ usecase/                  # auth, generic CRUD, dashboard + ports (interfaces)
+│     ├─ adapter/
+│     │  ├─ http/                  # Fiber router, DTOs, cookies, error mapping
+│     │  └─ postgres/              # repositories, migrate (schema_migrations)
+│     │     └─ migrations/001_init.sql
+│     ├─ platform/                 # config, security (bcrypt, tokens), webui (go:embed)
+│     └─ app/                      # composition root
+├─ .github/                        # CI workflow, dependabot
+├─ Makefile                        # make help
 ├─ web/
 │  └─ src/
 │     ├─ api.ts  auth.tsx  format.ts  hooks.ts
@@ -101,28 +105,31 @@ sequenceDiagram
 | POST | `/api/auth/login` | – | rate limited |
 | GET | `/api/auth/me` | session (pending OK) | |
 | POST | `/api/auth/logout` | session (pending OK) | |
-| POST | `/api/auth/password` | session (pending OK) | `{currentPassword, newPassword}` |
+| POST | `/api/auth/password` | session (pending OK) | `{currentPassword, newPassword}`, rate limited |
 | GET | `/api/dashboard` | session | totals + per class + allocation |
 | GET | `/api/{resource}` | session | list จาก `v_*` view, filter ได้ด้วย `?field=value` |
 | GET | `/api/{resource}/:id` | session | |
 | POST | `/api/{resource}` | session | create, ตอบ 201 พร้อม row จาก view |
-| PATCH | `/api/{resource}/:id` | session | partial update |
+| PUT | `/api/{resource}/:id` | session | replace ทั้ง row |
 | DELETE | `/api/{resource}/:id` | session | 204 |
 
 `{resource}` = `brokers`, `broker-transactions`, `funds`, `pvd-years`, `savings-accounts`, `insurers`,
 `insurance-payments`, `salary-months`, `tax-deductions`
 
-**Generic CRUD**: แต่ละ resource ประกาศเป็น spec ใน `internal/api/resources.go` (table, view, fields + type/enum/required)
-ชื่อคอลัมน์ใน SQL มาจาก spec เท่านั้น ส่วนค่าจาก user ส่งผ่าน placeholder `?` ทั้งหมด จึงไม่มีทาง SQL injection
+**Generic CRUD**: แต่ละ resource ประกาศเป็น spec ใน `internal/adapter/http/resources.go` (table, view, fields + type/enum/required)
+ชื่อคอลัมน์ใน SQL มาจาก spec เท่านั้น ส่วนค่าจาก user ส่งผ่าน placeholder `$n` ทั้งหมด จึงไม่มีทาง SQL injection
 ถ้าจะเพิ่ม resource ใหม่ ให้เพิ่ม migration + spec 1 ก้อน + page ฝั่ง React 1 ไฟล์
 
 ## Security checklist
 
 - [x] Password hash ด้วย bcrypt, ป้องกัน timing attack ตอนหา username
 - [x] Session token แบบสุ่ม 256-bit, เก็บเป็น hash, หมดอายุใน 7 วัน, ลบ session ที่หมดอายุแล้วทุกครั้งที่ login
-- [x] Login rate limit
-- [x] `helmet` middleware (security headers)
+- [x] Rate limit 10/นาที/IP ที่ login และ change password
+- [x] Password 8–72 bytes (bcrypt ตัดที่ 72 bytes; ยาวกว่านั้นตอบ 400 แทน 500)
+- [x] `helmet` middleware + CSP `default-src 'self'`, `frame-ancestors 'none'`; HSTS เมื่อ `COOKIE_SECURE=true`
+- [x] CSRF defense-in-depth: `POST`/`PUT` ใต้ `/api` ต้องเป็น `application/json` (ไม่งั้นตอบ 415)
 - [x] Body limit 1 MB, ไม่รับ field ที่ไม่รู้จัก, ตรวจ type และ enum
+- [x] `make vulncheck` (govulncheck + npm audit) รันใน CI ทุก push และทุกสัปดาห์; dependabot อัปเดต dependency
 - [x] Internal errors ถูก log ไว้ แต่ไม่ส่งรายละเอียดให้ client
 - [ ] HTTPS: ถ้าจะเปิดออก internet ให้วางหลัง Caddy / Cloudflare Tunnel / Tailscale และตั้ง `COOKIE_SECURE=true`
 - [ ] Backup: ตั้ง scheduled task รัน `pg_dump -Fc` แล้วเก็บไฟล์ไว้ที่อื่น
