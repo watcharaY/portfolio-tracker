@@ -270,6 +270,7 @@ make deploy-down                                            # stop (ข้อม
 | `make sqlc` / `sqlc-check` | generate Go จาก `queries/*.sql` ด้วย sqlc (ผ่าน Docker) / เช็คว่าไฟล์ที่ commit ตรงกับที่ generate ใหม่ |
 | `make test` / `lint` | Go tests / sqlc-check + go vet + gofmt + tsc |
 | `make e2e` | รัน Playwright ทุก spec ใน `e2e/tests` บน stack แยก (web :8100, DB ในหน่วยความจำ) ด้วยข้อมูลสมมติ แล้วปิด stack ให้ (Windows ใช้ Edge ที่ติดตั้งอยู่) |
+| `make docs-screenshots` | สร้างภาพใน `docs/images` ใหม่จากข้อมูลสมมติ (ไม่มีข้อมูลจริงในภาพ) |
 | `make e2e-ui` / `e2e-down` | เปิด Playwright UI mode ไว้ดูทีละ step / ปิด stack |
 | `make vulncheck` | `govulncheck` (Go + stdlib) และ `npm audit` |
 | `make check` | lint + test + vulncheck (เหมือน CI) |
@@ -346,7 +347,7 @@ docs/                    design docs
 
 | | |
 |---|---|
-| [01 · Design pages](docs/01-design-pages.md) | sitemap, wireframes, screenshots, review checklist |
+| [01 · Design pages](docs/01-design-pages.md) | sitemap, wireframes, screenshots |
 | [02 · Database ER](docs/02-db-er.md) | ER diagram, conventions, Excel → table mapping |
 | [03 · User journey](docs/03-user-journey.md) | first login, monthly update, session expiry |
 | [04 · System design](docs/04-system-design.md) | architecture, auth flow, API, security, deployment, roadmap |

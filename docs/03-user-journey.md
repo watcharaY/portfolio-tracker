@@ -27,7 +27,7 @@ journey
       สิ้นปี → ดู Salary & Tax + ลดหย่อน: 3: Owner
 ```
 
-คะแนน 1–5 = ความลื่นไหลที่คาดไว้ ส่วนที่ได้ 2 คือการกรอกข้อมูลย้อนหลัง ซึ่งเป็นเหตุผลที่ควรมีตัว import จาก Excel (ดู Open questions ใน 01)
+คะแนน 1–5 = ความลื่นไหลที่คาดไว้ ส่วนที่ได้ 2 คือการกรอกข้อมูลย้อนหลัง ซึ่งแก้ด้วยการ import จาก Excel (`make seed-sql` / `make db-seed`)
 
 ## Flow 1 — First login (seeded admin/admin)
 

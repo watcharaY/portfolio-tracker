@@ -160,7 +160,7 @@ PLAYWRIGHT  := node node_modules/@playwright/test/cli.js
 E2E_CHANNEL ?= $(if $(filter Windows_NT,$(OS)),msedge,)
 export E2E_CHANNEL
 
-.PHONY: e2e e2e-up e2e-ui e2e-down
+.PHONY: e2e e2e-up e2e-ui e2e-down docs-screenshots
 e2e-up: ## Build and start the throwaway e2e stack (web :8100, in-memory db :55432)
 	$(E2E) up -d --build --wait
 	cd e2e && npm ci
@@ -171,6 +171,9 @@ e2e: e2e-up ## Run the Playwright suite on made-up data, then stop the stack
 
 e2e-ui: e2e-up ## Open Playwright UI mode against the e2e stack (stop it with e2e-down)
 	cd e2e && $(PLAYWRIGHT) test --ui
+
+docs-screenshots: e2e-up ## Regenerate docs/images from the made-up e2e seed, then stop the stack
+	status=0; (cd e2e && UPDATE_SCREENSHOTS=1 $(PLAYWRIGHT) test tests/docs-screenshots.spec.ts) || status=$$?; $(E2E) down; exit $$status
 
 e2e-down: ## Stop the e2e stack and drop its data
 	$(E2E) down

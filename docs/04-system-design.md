@@ -83,7 +83,7 @@ sequenceDiagram
     S->>S: bcrypt.Compare (dummy hash ถ้าไม่พบ user → timing เท่ากัน)
     S->>S: token = 32 random bytes (base64url)
     S->>D: INSERT sessions(token_hash = sha256(token), expires_at)
-    F-->>B: Set-Cookie pt_session=token; HttpOnly; SameSite=Strict; [Secure]
+    F-->>B: "Set-Cookie pt_session=token#59; HttpOnly#59; SameSite=Strict#59; [Secure]"
     Note over B,F: request ต่อไป
     B->>F: GET /api/funds (cookie)
     F->>S: Require(): hash cookie → lookup session ที่ยังไม่หมดอายุ

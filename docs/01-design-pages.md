@@ -33,23 +33,17 @@ flowchart LR
 ## App shell
 
 ```
-┌────────────────┬──────────────────────────────────────────────┐
-│ Portfolio      │  <Page title>                                │
-│ Tracker        │  hint text                                   │
-│                │ ┌──────────────────────────────────────────┐ │
-│ ▸ Dashboard    │ │ Card                              [+Add] │ │
-│   Brokerage    │ │ table ...                                │ │
-│   Mutual Funds │ └──────────────────────────────────────────┘ │
-│   Provident    │                                              │
-│   Savings      │                                              │
-│   Insurance    │                                              │
-│   Salary & Tax │                                              │
-│                │                                              │
-│ admin [Logout] │                                              │
-└────────────────┴──────────────────────────────────────────────┘
-  มือถือ (< 760px): sidebar กลายเป็นแถบเมนูแนวนอนด้านบน
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Portfolio สมุดพอร์ต  Overview  Brokerage  Funds  Provident fund  …   e2e  Log out │
+├──────────────────────────────────────────────────────────────────────────┤
+│  <Page title>                                                            │
+│  ┌ Card ─────────────────────────────────────────────────── [+ Add] ┐    │
+│  │ table …                                                          │    │
+│  └──────────────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
+- เมนูอยู่ด้านบน (`Layout.tsx`) หน้าที่เปิดอยู่มี `aria-current="page"`
 - Light/Dark ตาม OS (`prefers-color-scheme`) และ override ได้ด้วย `<html data-theme="dark|light">`
 - ตัวเลขชิดขวา และใช้ `tabular-nums` ทุกตาราง
 
@@ -82,12 +76,14 @@ flowchart LR
 
 ![dashboard dark](images/dashboard-dark.png)
 
-| ส่วน | ที่มา (เทียบสูตรใน Excel) |
+| ส่วน | ที่มา |
 |---|---|
-| KPI: AUM / Total cost / Unrealised P/L / P/L % | `Dashboard!B5:E5` |
-| Est. savings interest | `SUM(balance × rate)` ⇒ `Dashboard!B6` |
-| Allocation bar | `Dashboard!G9:G13` แสดงเป็น stacked bar 100% แบบแท่งเดียว hover แล้วเห็นรายละเอียด |
-| ตาราง By asset class | `Dashboard!B8:G15` |
+| ประโยคบนสุด: มูลค่ารวม, มากกว่า/น้อยกว่าเงินที่ใส่ไปเท่าไร (%), ต้นทุนรวม | `total` จาก `GET /api/dashboard` |
+| ดอกเบี้ยเงินฝากโดยประมาณต่อปี | `estSavingsInterestPerYear` = Σ balance × rate |
+| Donut + ตาราง Allocation | `classes` (มูลค่า, ต้นทุน, P/L, P/L %, สัดส่วน) หมวดที่มูลค่าเป็น 0 ไม่แสดงใน donut แต่ยังอยู่ในตาราง hover แถวแล้ว donut เน้นหมวดนั้น |
+| พอร์ตว่าง | แสดงข้อความแนะนำให้เริ่มจาก Brokerage หรือ Savings |
+
+ภาพทั้งหมดในหน้านี้สร้างจากข้อมูลสมมติ (`make docs-screenshots`)
 
 แต่ละ asset class มีสีประจำตัวคงที่ (Stocks=น้ำเงิน, Funds=ส้ม, PVD=เขียวน้ำทะเล, Savings=เหลือง, Insurance=ชมพู)
 สีไม่เปลี่ยนตามลำดับหรือการกรอง ข้อมูลเดียวกันมีในตารางด้วย จึงไม่ต้องดูจากสีอย่างเดียว
@@ -96,7 +92,7 @@ flowchart LR
 
 ![brokerage](images/brokerage-light.png)
 
-- Card บน = **Brokers** แก้ได้เฉพาะ Name / Current Value / Note ส่วน Deposits, Withdrawals, Net Capital, P/L และ P/L % มาจาก view `v_brokers`
+- Card บน = **Brokers** แก้ได้เฉพาะ Name / Current Value / Note ส่วน Deposits, Withdrawals, Net Capital, P/L และ P/L % คำนวณจากรายการด้านล่าง
 - Card ล่าง = **Deposit / Withdraw log** เลือก Broker จาก dropdown และ Type ได้แค่ deposit/withdraw (เท่ากับ data validation ใน Excel)
 - เพิ่มหรือลบ log แล้ว card บนจะ refresh เอง
 
@@ -112,7 +108,7 @@ flowchart LR
 └────────────────────────────────────────────────────────────────┘
 ```
 
-- คอลัมน์ `auto` = คำนวณจาก view แก้ไม่ได้
+- คอลัมน์ `auto` = ค่าที่ API คำนวณให้ แก้ไม่ได้
 - Savings: กรอก Interest Rate เป็น % (2.5) แต่เก็บใน DB เป็น basis points (250)
 
 ## 8. Insurance
@@ -135,12 +131,3 @@ Salary & Tax                                   Year [2026]
 ```
 
 - ใน Excel ชีตนี้ผูกกับปี 2026 ใน app เปลี่ยนเป็นตัวเลือกปี (`?year=`) จึงใช้ได้ทุกปี
-- คอลัมน์ Salary Inc. / Inc. % / "if not prorated" ใน Excel ยังไม่ได้ย้ายมา ดู Open questions
-
-## Review checklist / Open questions
-
-- [ ] **Salary Inc. %, "if not prorated"**: ต้องการคำนวณใน view หรือแสดงเป็นรายงานแยก?
-- [ ] **Tax estimate**: ใช้ข้อมูลเงินเดือนและรายการลดหย่อนที่มีอยู่แล้ว คำนวณภาษีทั้งปีตามขั้นบันได และเทียบกับภาษีที่ถูกหัก ณ ที่จ่าย?
-- [ ] **ประวัติมูลค่า (snapshots)**: เก็บ AUM รายเดือนเพื่อทำกราฟ trend? (ร่างตารางไว้ใน 02-db-er.md)
-- [ ] **Import จาก Excel**: ทำ CLI สำหรับ import `Portfolio-Tracker.xlsx` ครั้งเดียว?
-- [ ] **Fund units/NAV**: ตอนนี้กรอก market value เอง อนาคตจะเก็บจำนวน units × NAV แล้วดึง NAV อัตโนมัติไหม?
