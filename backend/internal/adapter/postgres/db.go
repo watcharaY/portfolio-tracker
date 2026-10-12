@@ -6,17 +6,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/watcharaY/portfolio-tracker/backend/internal/adapter/postgres/internal/gen"
 	"github.com/watcharaY/portfolio-tracker/backend/internal/usecase"
 )
-
-type querier interface {
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}
 
 type txKey struct{}
 
@@ -49,11 +43,14 @@ func Connect(ctx context.Context, url string) (*DB, error) {
 
 func (db *DB) Close() { db.Pool.Close() }
 
-func (db *DB) q(ctx context.Context) querier {
+// q binds the generated queries to the transaction WithinTx stored in ctx, or
+// to the pool outside one. Every error it returns is already a domain error.
+func (db *DB) q(ctx context.Context) *gen.Queries {
+	var conn gen.DBTX = db.Pool
 	if tx, ok := ctx.Value(txKey{}).(pgx.Tx); ok {
-		return tx
+		conn = tx
 	}
-	return db.Pool
+	return gen.New(domainErrors{conn})
 }
 
 func (db *DB) WithinTx(ctx context.Context, fn func(ctx context.Context) error) error {
