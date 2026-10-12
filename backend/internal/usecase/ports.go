@@ -29,7 +29,12 @@ type (
 	InsurancePaymentRepository  = Repository[*domain.InsurancePayment, domain.InsurancePayment, domain.InsurancePaymentFilter]
 	SalaryRepository            = Repository[*domain.SalaryMonth, domain.SalaryMonth, domain.YearFilter]
 	TaxDeductionRepository      = Repository[*domain.TaxDeduction, domain.TaxDeduction, domain.YearFilter]
+	DividendRepository          = Repository[*domain.DividendPayment, domain.DividendPayment, domain.YearFilter]
 )
+
+type DividendSummaryRepository interface {
+	Summary(ctx context.Context, year int) ([]domain.DividendSourceYear, error)
+}
 
 type UserRepository interface {
 	Count(ctx context.Context) (int, error)

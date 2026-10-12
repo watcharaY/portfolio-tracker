@@ -81,6 +81,7 @@ func buildServices(db *postgres.DB, cfg config.Config) (httpadapter.Services, er
 	pvd := postgres.NewPVDRepo(db)
 	savings := postgres.NewSavingsRepo(db)
 	insurers := postgres.NewInsurerRepo(db)
+	dividends := postgres.NewDividendRepo(db)
 
 	auth, err := usecase.NewAuthService(usecase.AuthDeps{
 		Users:    postgres.NewUserRepo(db),
@@ -108,5 +109,7 @@ func buildServices(db *postgres.DB, cfg config.Config) (httpadapter.Services, er
 		InsurancePayments: usecase.NewCRUD(postgres.NewInsurancePaymentRepo(db)),
 		Salary:            usecase.NewCRUD(postgres.NewSalaryRepo(db)),
 		TaxDeductions:     usecase.NewCRUD(postgres.NewTaxDeductionRepo(db)),
+		Dividends:         usecase.NewCRUD(dividends),
+		DividendSummary:   usecase.NewDividendSummaryService(dividends),
 	}, nil
 }

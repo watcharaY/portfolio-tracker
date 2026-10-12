@@ -171,8 +171,12 @@ func TestMigrateIsIdempotent(t *testing.T) {
 
 	noErr(t, postgres.Migrate(ctx, db))
 
-	if after := scalar[int](t, "SELECT COUNT(*)::INT FROM schema_migrations"); after != before || after != 1 {
-		t.Fatalf("schema_migrations rows = %d after second Migrate, want %d (1)", after, before)
+	files, err := os.ReadDir("migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after := scalar[int](t, "SELECT COUNT(*)::INT FROM schema_migrations"); after != before || after != len(files) {
+		t.Fatalf("schema_migrations rows = %d after second Migrate, want %d (one per file in migrations/)", after, len(files))
 	}
 	got := must(brokers.List(ctx, domain.NoFilter{}))(t)
 	wantRows(t, rows(got, func(b domain.BrokerSummary) string { return b.Name }), []string{"Keep"})

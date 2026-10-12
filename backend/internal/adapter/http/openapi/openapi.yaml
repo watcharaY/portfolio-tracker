@@ -30,6 +30,7 @@ tags:
   - name: savings
   - name: insurance
   - name: salary
+  - name: dividends
   - name: docs
 
 paths:
@@ -639,6 +640,73 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /dividends:
+    get:
+      tags: [dividends]
+      summary: List dividend, interest and payout payments, newest first
+      parameters:
+        - { name: year, in: query, required: false, schema: { type: integer } }
+      responses:
+        "200": { description: Payments., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Dividend" } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [dividends]
+      summary: Record a payment
+      requestBody: { $ref: "#/components/requestBodies/Dividend" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Dividend" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+  /dividends/summary:
+    get:
+      tags: [dividends]
+      summary: Totals per asset for one year
+      description: The months each asset paid in show its rhythm (monthly, twice a year, yearly). Yield is the year's net payout over the asset's current value.
+      parameters:
+        - { name: year, in: query, required: false, description: Defaults to the current year., schema: { type: integer } }
+      responses:
+        "200": { description: Summary., content: { application/json: { schema: { $ref: "#/components/schemas/DividendYear" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /dividends/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [dividends]
+      summary: Get a payment
+      responses:
+        "200": { description: Payment., content: { application/json: { schema: { $ref: "#/components/schemas/Dividend" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [dividends]
+      summary: Replace a payment
+      requestBody: { $ref: "#/components/requestBodies/Dividend" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/Dividend" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+    delete:
+      tags: [dividends]
+      summary: Delete a payment
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /openapi.yaml:
     get:
       tags: [docs]
@@ -717,6 +785,9 @@ components:
     SalaryMonth:
       required: true
       content: { application/json: { schema: { $ref: "#/components/schemas/SalaryMonthInput" } } }
+    Dividend:
+      required: true
+      content: { application/json: { schema: { $ref: "#/components/schemas/DividendInput" } } }
     TaxDeduction:
       required: true
       content: { application/json: { schema: { $ref: "#/components/schemas/TaxDeductionInput" } } }
@@ -966,6 +1037,65 @@ components:
         sso: { $ref: "#/components/schemas/Satang" }
         created_at: { $ref: "#/components/schemas/Timestamp" }
         updated_at: { $ref: "#/components/schemas/Timestamp" }
+
+    DividendSource:
+      type: string
+      pattern: '^(broker|fund|savings|insurer):[1-9][0-9]*$'
+      description: The paying asset as type:id, e.g. broker:1. PVD pays nothing out in cash, so it is not a source.
+    DividendInput:
+      type: object
+      additionalProperties: false
+      properties:
+        source: { type: string, nullable: true, description: "broker:1, fund:2, savings:3 or insurer:4" }
+        paid_on: { type: string, format: date, nullable: true }
+        gross: { type: integer, format: int64, nullable: true }
+        withholding_tax: { type: integer, format: int64, nullable: true, description: Between 0 and gross. }
+        note: { type: string, nullable: true }
+    Dividend:
+      type: object
+      additionalProperties: false
+      required: [id, source, source_type, source_id, source_name, paid_on, gross, withholding_tax, net, note, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        source: { $ref: "#/components/schemas/DividendSource" }
+        source_type: { type: string, enum: [broker, fund, savings, insurer] }
+        source_id: { type: integer, format: int64 }
+        source_name: { type: string }
+        paid_on: { type: string, format: date }
+        gross: { $ref: "#/components/schemas/Satang" }
+        withholding_tax: { $ref: "#/components/schemas/Satang" }
+        net: { $ref: "#/components/schemas/Satang" }
+        note: { type: string }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+        updated_at: { $ref: "#/components/schemas/Timestamp" }
+    DividendYear:
+      type: object
+      additionalProperties: false
+      required: [year, sources, payments, gross, withholding_tax, net]
+      properties:
+        year: { type: integer }
+        payments: { type: integer }
+        gross: { $ref: "#/components/schemas/Satang" }
+        withholding_tax: { $ref: "#/components/schemas/Satang" }
+        net: { $ref: "#/components/schemas/Satang" }
+        sources:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [source, source_type, source_id, source_name, asset_value, payments, months, gross, withholding_tax, net, yield_pct]
+            properties:
+              source: { $ref: "#/components/schemas/DividendSource" }
+              source_type: { type: string, enum: [broker, fund, savings, insurer] }
+              source_id: { type: integer, format: int64 }
+              source_name: { type: string }
+              asset_value: { $ref: "#/components/schemas/Satang" }
+              payments: { type: integer }
+              months: { type: array, items: { type: integer, minimum: 1, maximum: 12 } }
+              gross: { $ref: "#/components/schemas/Satang" }
+              withholding_tax: { $ref: "#/components/schemas/Satang" }
+              net: { $ref: "#/components/schemas/Satang" }
+              yield_pct: { $ref: "#/components/schemas/Ratio" }
 
     TaxDeductionInput:
       type: object

@@ -50,5 +50,7 @@ sql:
           - { column: salary_months.pvd, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
           - { column: salary_months.sso, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
           - { column: tax_deductions.amount, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: dividend_payments.gross, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: dividend_payments.withholding_tax, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
           - { column: savings_accounts.interest_bp, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.BasisPoints }
           - { column: broker_transactions.type, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.TxnType }
