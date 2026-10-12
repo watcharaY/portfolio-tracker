@@ -87,8 +87,8 @@ dev-web: ## Run the Vite dev server on :5173 (proxies /api to :8080)
 test: ## Run Go tests (CI adds GOTESTFLAGS=-race)
 	cd backend && go test $(GOTESTFLAGS) ./...
 
-test-integration: db-up ## Run the Postgres adapter tests in a separate $(POSTGRES_DB)_test database
-	docker compose exec -T db sh -c 'createdb -U $(POSTGRES_USER) $(TEST_DB) 2>/dev/null || true'
+test-integration: db-up ## Run the Postgres adapter tests in a fresh $(POSTGRES_DB)_test database
+	docker compose exec -T db sh -c 'dropdb -U $(POSTGRES_USER) --if-exists $(TEST_DB) && createdb -U $(POSTGRES_USER) $(TEST_DB)'
 	cd backend && TEST_DATABASE_URL="postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(TEST_DB)?sslmode=disable" 		go test $(GOTESTFLAGS) -count=1 ./internal/adapter/postgres/
 
 vet: ## go vet + gofmt check
