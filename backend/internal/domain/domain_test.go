@@ -136,12 +136,43 @@ func TestValidation(t *testing.T) {
 }
 
 func TestValidateNewPassword(t *testing.T) {
-	for _, pw := range []string{"short", "admin", "Admin123", "ADMIN123", strings.Repeat("x", MaxPasswordBytes+1)} {
-		if ValidateNewPassword("admin123", pw) == nil {
-			t.Errorf("%q should be rejected", pw)
+	rejected := map[string]struct{ password, reason string }{
+		"too short":                 {"Ab1-short", "at least 12"},
+		"too long":                  {"Aa1-" + strings.Repeat("x", 61), "at most 64 characters"},
+		"over 72 bytes in Thai":     {"Aa1-" + strings.Repeat("ก", 30), "at most 72 bytes"},
+		"no uppercase":              {"tiger-mango-42", "uppercase"},
+		"no lowercase":              {"TIGER-MANGO-42", "lowercase"},
+		"no digit":                  {"Tiger-Mango-Rain", "digit"},
+		"no symbol":                 {"TigerMango42Rain", "symbol"},
+		"Thai is not a case letter": {"เสือมะม่วง-42-ฝน", "lowercase"},
+		"repeat of 4":               {"Tiger-Mango-4444", "repeat"},
+		"digit sequence":            {"Tiger-Mango-1234", "sequence"},
+		"letter sequence":           {"Wxyz-Mango-42-Rain", "sequence"},
+		"keyboard row":              {"Qwer-Mango-42-Rain", "sequence"},
+		"descending":                {"Tiger-Mango-9876", "sequence"},
+		"username":                  {"Somchai-Mango-42", "username"},
+		"admin":                     {"Admin@2026-Mango", "username, admin"},
+		"portfolio":                 {"My-Portfolio-42!", "username, admin"},
+		"leetspeak common":          {"P@ssw0rd2026!", "too common"},
+		"common with suffix":        {"Football2026!", "too common"},
+		"leetspeak 1 as l":          {"B@s3ba1l-2026!", "too common"},
+	}
+	for name, c := range rejected {
+		err := ValidateNewPassword("somchai", c.password)
+		var ve *ValidationError
+		if !errors.As(err, &ve) || ve.Field != "newPassword" || !strings.Contains(ve.Error(), c.reason) {
+			t.Errorf("%s: %q gave %v, want a newPassword error containing %q", name, c.password, err, c.reason)
 		}
 	}
-	if err := ValidateNewPassword("admin", "correct horse"); err != nil {
-		t.Errorf("good password rejected: %v", err)
+
+	for _, ok := range []string{
+		"Tiger-Mango-42-Rain",
+		"E2e-Tiger-Mango-42",
+		"ปลาทู 3 ตัว Kin Rice",
+		"Correct Horse 9 Staple",
+	} {
+		if err := ValidateNewPassword("somchai", ok); err != nil {
+			t.Errorf("%q rejected: %v", ok, err)
+		}
 	}
 }

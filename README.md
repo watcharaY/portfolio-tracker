@@ -365,7 +365,7 @@ docs/                    design docs
 
 ## Security
 
-- Password: bcrypt, ยาว 8–72 bytes, ห้ามเป็น `admin` หรือตรงกับ username; บัญชี `admin/admin` ที่ seed ไว้ต้องเปลี่ยนรหัสก่อนถึงจะเรียก API อื่นได้
+- Password: bcrypt, 12–64 ตัวอักษร (ไม่เกิน 72 bytes) ต้องมีตัวพิมพ์เล็ก ตัวพิมพ์ใหญ่ ตัวเลข และสัญลักษณ์ ห้ามซ้ำ/เรียง 4 ตัว (`aaaa`, `1234`, `qwer`) ห้ามมี username / `admin` / `portfolio` และห้ามอยู่ใน 10k รหัสที่หลุดบ่อยที่สุด (SecLists) หลัง normalize leetspeak และตัวเลข/สัญลักษณ์หัวท้าย (`P@ssw0rd2026!` → `password`); บัญชี `admin/admin` ที่ seed ไว้ต้องเปลี่ยนรหัสก่อนถึงจะเรียก API อื่นได้
 - Session: token สุ่ม 256-bit เก็บใน DB เฉพาะ SHA-256; cookie `HttpOnly` + `SameSite=Strict` (+ `Secure` เมื่อ `COOKIE_SECURE=true`); เปลี่ยนรหัสผ่านแล้ว session อื่นถูก revoke หมด
 - CSRF: นอกจาก SameSite=Strict แล้ว `POST`/`PUT` ใต้ `/api` ต้องเป็น `Content-Type: application/json` (ส่งข้าม site ไม่ได้ถ้าไม่ผ่าน CORS preflight)
 - Rate limit ต่อ IP (in-memory): ทุก `/api` 300 ครั้ง/นาที (`RATE_LIMIT_PER_MINUTE`) และ `/api/auth/login`, `/api/auth/password` 10 ครั้ง/นาที เกินแล้วตอบ `429` พร้อม `Retry-After` และ `X-RateLimit-*`

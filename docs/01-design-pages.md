@@ -68,7 +68,7 @@ flowchart LR
 ```
 
 - ถ้ายังไม่ได้เปลี่ยน backend ตอบ `403 PASSWORD_CHANGE_REQUIRED` ทุก endpoint ยกเว้น `/auth/me`, `/auth/logout`, `/auth/password`
-- รหัสผ่านใหม่ต้องยาวอย่างน้อย 8 ตัวอักษรและห้ามเป็น `admin` เปลี่ยนแล้ว session อื่นทั้งหมดจะถูก revoke
+- ใต้ช่อง New password มี checklist ที่ติ๊กตามที่พิมพ์ (12–64 ตัว, ตัวเล็ก, ตัวใหญ่, ตัวเลข, สัญลักษณ์, ยืนยันตรงกัน) ปุ่ม Save กดได้เมื่อครบ ส่วนรหัสยอดนิยม ลำดับ และชื่อผู้ใช้ server ตรวจตอนบันทึก (`domain.ValidateNewPassword`) เปลี่ยนแล้ว session อื่นทั้งหมดจะถูก revoke
 
 ## 3. Dashboard
 
