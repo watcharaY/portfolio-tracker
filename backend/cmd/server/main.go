@@ -1,4 +1,4 @@
-// Command server runs the Portfolio Tracker API and serves the embedded web UI.
+// Command server runs the Portfolio Tracker API, plus the built web UI when WEB_DIR is set.
 //
 //	server           migrate, seed the default user and serve
 //	server migrate   apply pending migrations and exit

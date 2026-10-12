@@ -107,16 +107,15 @@ vulncheck: ## Scan Go (govulncheck) and npm (npm audit) dependencies for known v
 check: lint test vulncheck ## Everything CI runs
 
 .PHONY: build-web build run clean
-build-web: ## Build the SPA into backend/internal/platform/webui/dist
+build-web: ## Build the SPA into web/dist
 	cd web && npm run build
 
-build: build-web ## Build the single binary with the SPA embedded
+build: ## Build the API binary (serves only /api unless WEB_DIR is set)
 	cd backend && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o $(notdir $(BIN)) ./cmd/server
 	@echo "built $(BIN)"
 
-run: build db-up ## Build and run the production binary
-	./$(BIN)
+run: build build-web db-up ## Build both and run the binary, serving web/dist too
+	cd backend && WEB_DIR=../web/dist ./$(notdir $(BIN))
 
 clean: ## Remove build output
-	rm -f $(BIN)
-	find backend/internal/platform/webui/dist -mindepth 1 ! -name .gitkeep -delete
+	rm -rf $(BIN) web/dist

@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -12,7 +14,6 @@ import (
 	"github.com/watcharaY/portfolio-tracker/backend/internal/adapter/postgres"
 	"github.com/watcharaY/portfolio-tracker/backend/internal/platform/config"
 	"github.com/watcharaY/portfolio-tracker/backend/internal/platform/security"
-	"github.com/watcharaY/portfolio-tracker/backend/internal/platform/webui"
 	"github.com/watcharaY/portfolio-tracker/backend/internal/usecase"
 )
 
@@ -29,6 +30,14 @@ func Migrate(ctx context.Context, cfg config.Config) error {
 }
 
 func Run(ctx context.Context, cfg config.Config) error {
+	httpCfg := httpadapter.Config{CookieSecure: cfg.CookieSecure, CORSOrigin: cfg.CORSOrigin}
+	if cfg.WebDir != "" {
+		httpCfg.WebUI = os.DirFS(cfg.WebDir)
+		if _, err := fs.Stat(httpCfg.WebUI, "index.html"); err != nil {
+			return fmt.Errorf("WEB_DIR %q: %w", cfg.WebDir, err)
+		}
+	}
+
 	db, err := postgres.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
@@ -51,11 +60,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 		slog.Warn("seeded default user admin/admin — you will be asked to change the password on first login")
 	}
 
-	server := httpadapter.NewServer(httpadapter.Config{
-		CookieSecure: cfg.CookieSecure,
-		CORSOrigin:   cfg.CORSOrigin,
-		WebUI:        webui.FS(),
-	}, services)
+	server := httpadapter.NewServer(httpCfg, services)
 
 	slog.Info("listening", "addr", cfg.Addr)
 	return server.Listen(cfg.Addr, fiber.ListenConfig{
