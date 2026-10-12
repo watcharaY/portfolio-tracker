@@ -91,6 +91,7 @@ func buildServices(db *postgres.DB, cfg config.Config) (httpadapter.Services, er
 	}
 
 	return httpadapter.Services{
+		Ready:             db.Ping,
 		Auth:              auth,
 		Dashboard:         usecase.NewDashboardService(brokers, funds, pvd, savings, insurers),
 		Brokers:           usecase.NewCRUD(brokers),

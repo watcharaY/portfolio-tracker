@@ -44,6 +44,27 @@ paths:
                 properties:
                   ok: { type: boolean }
 
+  /ready:
+    get:
+      tags: [auth]
+      summary: Readiness check
+      description: Pings the database with a 2 s timeout. Docker's healthcheck (`server healthcheck`) calls this.
+      security: []
+      responses:
+        "200":
+          description: The API can reach its database.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        "503":
+          description: The database is unreachable. The cause is logged, not returned.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
   /auth/login:
     post:
       tags: [auth]

@@ -43,6 +43,8 @@ func Connect(ctx context.Context, url string) (*DB, error) {
 
 func (db *DB) Close() { db.Pool.Close() }
 
+func (db *DB) Ping(ctx context.Context) error { return db.Pool.Ping(ctx) }
+
 // q binds the generated queries to the transaction WithinTx stored in ctx, or
 // to the pool outside one. Every error it returns is already a domain error.
 func (db *DB) q(ctx context.Context) *gen.Queries {

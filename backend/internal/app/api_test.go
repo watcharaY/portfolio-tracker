@@ -172,6 +172,7 @@ func TestAPI_Auth(t *testing.T) {
 	c, want := newAPI(t)
 
 	c.expect(http.MethodGet, "/health", nil, http.StatusOK)
+	c.expect(http.MethodGet, "/ready", nil, http.StatusOK)
 	c.expect(http.MethodGet, "/auth/me", nil, http.StatusUnauthorized)
 	c.expect(http.MethodGet, "/funds", nil, http.StatusUnauthorized)
 	c.expect(http.MethodPost, "/auth/login", map[string]string{"username": "e2e", "password": "wrong"}, http.StatusUnauthorized)

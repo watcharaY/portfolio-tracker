@@ -32,4 +32,5 @@ services:
     ports:
       - "127.0.0.1:${E2E_PORT:-8100}:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy

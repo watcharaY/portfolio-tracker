@@ -10,4 +10,5 @@ RUN go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
 FROM gcr.io/distroless/static:nonroot
 COPY --from=build /out/server /server
 EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=6s --start-period=10s --retries=3 CMD ["/server", "healthcheck"]
 ENTRYPOINT ["/server"]
