@@ -72,6 +72,7 @@ make deploy-down                                            # stop (ข้อม
 | `make db-reset` | **ลบข้อมูลทั้งหมด** (drop schema `public`) แล้ว migrate ใหม่ ถามยืนยันก่อน, `FORCE=1` ข้ามการถาม |
 | `make db-psql` | เปิด psql shell |
 | `make seed-sql` | สร้าง `private/seed-data.sql` จาก Excel (`XLSX=...` เปลี่ยนไฟล์ได้) |
+| `make db-seed` | `seed-sql` + migrate แล้วโหลดเข้า DB local ตารางต้องว่าง (`make db-reset` ก่อน) |
 | `make migration name=x` | สร้างไฟล์ migration เปล่า `YYYYMMDDHHMMSS_x.sql` (เวลา UTC) |
 | `make sqlc` / `sqlc-check` | generate Go จาก `queries/*.sql` ด้วย sqlc (ผ่าน Docker) / เช็คว่าไฟล์ที่ commit ตรงกับที่ generate ใหม่ |
 | `make test` / `lint` | Go tests / sqlc-check + go vet + gofmt + tsc |
@@ -82,6 +83,8 @@ make deploy-down                                            # stop (ข้อม
 | `make deploy-up` / `deploy-down` | start / stop stack ใน `deploy/` |
 
 ### Import ข้อมูลจาก Excel (ครั้งเดียว)
+
+บนเครื่อง local: `make db-reset && make db-seed`
 
 ย้ายข้อมูลจาก `Portfolio-Tracker.xlsx` เข้า DB บน prod:
 

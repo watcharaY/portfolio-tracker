@@ -53,6 +53,11 @@ db-psql: db-up ## Open a psql shell
 seed-sql: ## Generate private/seed-data.sql from $(XLSX) (git-ignored, run once on a fresh DB)
 	cd backend && go run ./cmd/xlsx2sql -in "$(XLSX)" -out ../private/seed-data.sql
 
+.PHONY: db-seed
+db-seed: seed-sql db-migrate ## Load $(XLSX) into the local DB (tables must be empty: run db-reset first)
+	$(PSQL) -q < private/seed-data.sql
+	@echo "Seeded $(POSTGRES_DB) from $(XLSX)"
+
 .PHONY: migration
 migration: ## Create an empty migration: make migration name=add_fund_tags
 	@[[ "$(name)" =~ ^[a-z0-9_]+$$ ]] || { echo "name must be snake_case, e.g. make migration name=add_fund_tags"; exit 1; }
