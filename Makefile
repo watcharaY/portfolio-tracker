@@ -108,12 +108,13 @@ dev-web: ## Run the Vite dev server on :5173 (proxies /api to :8080)
 	cd web && npm run dev
 
 .PHONY: test test-integration vet typecheck lint vulncheck check
+# -p 1: the postgres and app packages both reset the database behind TEST_DATABASE_URL.
 test: ## Run Go tests (CI adds GOTESTFLAGS=-race)
-	cd backend && go test $(GOTESTFLAGS) ./...
+	cd backend && go test -p 1 $(GOTESTFLAGS) ./...
 
-test-integration: db-up ## Run the Postgres adapter tests in a fresh $(POSTGRES_DB)_test database
+test-integration: db-up ## Run the Postgres and API tests in a fresh $(POSTGRES_DB)_test database
 	docker compose exec -T db sh -c 'dropdb -U $(POSTGRES_USER) --if-exists $(TEST_DB) && createdb -U $(POSTGRES_USER) $(TEST_DB)'
-	cd backend && TEST_DATABASE_URL="postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(TEST_DB)?sslmode=disable" 		go test $(GOTESTFLAGS) -count=1 ./internal/adapter/postgres/
+	cd backend && TEST_DATABASE_URL="postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(TEST_DB)?sslmode=disable" 		go test -p 1 $(GOTESTFLAGS) -count=1 ./internal/adapter/postgres/ ./internal/app/
 
 vet: ## go vet + gofmt check
 	cd backend && go vet ./...
