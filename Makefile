@@ -10,6 +10,9 @@ POSTGRES_DB       ?= portfolio
 POSTGRES_PORT     ?= 5432
 TEST_DB           := $(POSTGRES_DB)_test
 XLSX              ?= $(HOME)/Desktop/Portfolio-Tracker.xlsx
+PG_DIR            := backend/internal/adapter/postgres
+GEN_DIR           := $(PG_DIR)/internal/gen
+SQLC_VERSION      := 1.31.1
 
 BIN         := backend/portfolio-tracker$(if $(filter Windows_NT,$(OS)),.exe,)
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
@@ -53,9 +56,25 @@ seed-sql: ## Generate private/seed-data.sql from $(XLSX) (git-ignored, run once 
 .PHONY: migration
 migration: ## Create an empty migration: make migration name=add_fund_tags
 	@[[ "$(name)" =~ ^[a-z0-9_]+$$ ]] || { echo "name must be snake_case, e.g. make migration name=add_fund_tags"; exit 1; }
-	@f=backend/internal/adapter/postgres/migrations/$$(date -u +%Y%m%d%H%M%S)_$(name).sql; \
+	@f=$(PG_DIR)/migrations/$$(date -u +%Y%m%d%H%M%S)_$(name).sql; \
 		( set -C; printf -- '-- %s\n' "$(name)" > "$$f" ) 2>/dev/null || { echo "$$f exists; wait a second and retry"; exit 1; }; \
 		echo "created $$f"
+
+.PHONY: sqlc sqlc-check
+# sqlc needs cgo, which is unreliable on Windows, so it runs from its pinned
+# image everywhere. pwd -W gives Docker Desktop a C:/ path under Git Bash, and
+# MSYS_NO_PATHCONV stops Git Bash rewriting /src.
+sqlc: ## Regenerate Go code from migrations/ and queries/ with sqlc
+	MSYS_NO_PATHCONV=1 docker run --rm -v "$$(cd $(PG_DIR) && (pwd -W 2>/dev/null || pwd)):/src" -w /src sqlc/sqlc:$(SQLC_VERSION) generate
+
+# Generating into an empty dir also catches orphan files left by a deleted query.
+sqlc-check: ## Fail when the committed sqlc output differs from a fresh generate
+	rm -rf $(GEN_DIR)
+	$(MAKE) --no-print-directory sqlc
+	@if [ -n "$$(git status --porcelain -- $(GEN_DIR))" ]; then \
+		git status --short -- $(GEN_DIR); git diff -- $(GEN_DIR); \
+		echo "sqlc output is stale: run 'make sqlc' and commit $(GEN_DIR)"; exit 1; \
+	fi
 
 .PHONY: dev-api dev-web
 dev-api: db-up ## Run the backend on :8080
@@ -79,7 +98,7 @@ vet: ## go vet + gofmt check
 typecheck: ## TypeScript type check
 	cd web && npm run typecheck
 
-lint: vet typecheck ## All static checks
+lint: sqlc-check vet typecheck ## All static checks
 
 vulncheck: ## Scan Go (govulncheck) and npm (npm audit) dependencies for known vulnerabilities
 	cd backend && go run $(GOVULNCHECK) ./...

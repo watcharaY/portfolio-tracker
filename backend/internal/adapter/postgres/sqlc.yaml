@@ -1,0 +1,54 @@
+version: "2"
+sql:
+  - engine: postgresql
+    # The same files Migrate embeds. Timestamp prefixes make lexical order apply order.
+    schema: migrations
+    queries: queries
+    gen:
+      go:
+        package: gen
+        # Under postgres/internal/, so nothing outside the adapter can import it.
+        out: internal/gen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        # :many returns [] for no rows, as pgx.CollectRows did.
+        emit_empty_slices: true
+        # Table models match the domain structs field for field, so a repo
+        # converts a row with domain.X(row) and any drift fails to compile.
+        initialisms: [id, ip, pvd, sso]
+        rename:
+          txn_date: Date
+          interest_bp: InterestRate
+        overrides:
+          - db_type: pg_catalog.int4
+            go_type: int
+          - db_type: pg_catalog.int4
+            go_type: { type: int, pointer: true }
+            nullable: true
+          - db_type: date
+            go_type: time.Time
+          - db_type: date
+            go_type: { import: time, type: Time, pointer: true }
+            nullable: true
+          - db_type: timestamptz
+            go_type: time.Time
+          # Money (satang). A money column missing here generates int64 and
+          # the domain conversion in its repo stops compiling.
+          - { column: brokers.current_value, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: broker_transactions.amount, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: funds.cost, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: funds.market_value, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: pvd_years.self_contribution, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: pvd_years.company_contribution, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: pvd_years.self_profit, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: pvd_years.company_profit, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: savings_accounts.balance, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: insurance_payments.premium, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: salary_months.salary, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: salary_months.bonus, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: salary_months.withholding_tax, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: salary_months.pvd, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: salary_months.sso, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: tax_deductions.amount, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.Money }
+          - { column: savings_accounts.interest_bp, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.BasisPoints }
+          - { column: broker_transactions.type, go_type: github.com/watcharaY/portfolio-tracker/backend/internal/domain.TxnType }
