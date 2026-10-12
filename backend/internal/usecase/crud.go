@@ -16,6 +16,7 @@ type (
 	InsurancePaymentService  = CRUD[*domain.InsurancePayment, domain.InsurancePayment, domain.InsurancePaymentFilter]
 	SalaryService            = CRUD[*domain.SalaryMonth, domain.SalaryMonth, domain.YearFilter]
 	TaxDeductionService      = CRUD[*domain.TaxDeduction, domain.TaxDeduction, domain.YearFilter]
+	DividendService          = CRUD[*domain.DividendPayment, domain.DividendPayment, domain.YearFilter]
 )
 
 type CRUD[W Validatable, R any, F any] struct {

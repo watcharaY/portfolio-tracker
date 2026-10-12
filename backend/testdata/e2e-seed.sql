@@ -12,7 +12,7 @@ END $$;
 BEGIN;
 
 TRUNCATE users, sessions, brokers, broker_transactions, funds, pvd_years, savings_accounts,
-         insurers, insurance_payments, salary_months, tax_deductions RESTART IDENTITY CASCADE;
+         insurers, insurance_payments, salary_months, tax_deductions, dividend_payments RESTART IDENTITY CASCADE;
 
 -- 1: admin/admin, still forced to change the password.
 -- 2: e2e / E2e-Tiger-Mango-42, password already changed.
@@ -81,5 +81,26 @@ INSERT INTO tax_deductions (year, item, amount) VALUES
     (2025, 'ประกันสังคม',    900000),
     (2025, 'Life insurance', 2500000),
     (2026, 'ส่วนตัว',        6000000);
+
+-- One source per rhythm in 2025: quarterly broker, twice-yearly fund and savings
+-- interest (Jun/Dec), monthly savings interest, a yearly insurance payout.
+-- Totals for 2025 are in e2e-expected.json under dividends2025.
+INSERT INTO dividend_payments (broker_id, fund_id, savings_account_id, insurer_id, paid_on, gross, withholding_tax, note)
+SELECT 1, NULL::BIGINT, NULL::BIGINT, NULL::BIGINT, make_date(2025, m, 15), 300000, 30000, 'quarterly'
+FROM unnest(ARRAY[3, 6, 9, 12]) AS m;
+
+INSERT INTO dividend_payments (broker_id, fund_id, savings_account_id, insurer_id, paid_on, gross, withholding_tax, note) VALUES
+    (NULL, 1, NULL, NULL, '2025-04-20', 500000, 50000, 'ปันผลครึ่งปี'),
+    (NULL, 1, NULL, NULL, '2025-10-20', 500000, 50000, 'ปันผลครึ่งปี'),
+    (NULL, NULL, 1, NULL, '2025-06-30', 375000, 56250, 'ดอกเบี้ย มิ.ย.'),
+    (NULL, NULL, 1, NULL, '2025-12-31', 375000, 56250, 'ดอกเบี้ย ธ.ค.'),
+    (NULL, NULL, NULL, 1, '2025-11-01', 200000, 0, 'เงินคืนรายปี');
+
+INSERT INTO dividend_payments (broker_id, fund_id, savings_account_id, insurer_id, paid_on, gross, withholding_tax, note)
+SELECT NULL, NULL, 2, NULL, make_date(2025, m, 28), 62500, 0, 'monthly'
+FROM generate_series(1, 12) AS m;
+
+INSERT INTO dividend_payments (broker_id, fund_id, savings_account_id, insurer_id, paid_on, gross, withholding_tax, note) VALUES
+    (1, NULL, NULL, NULL, '2026-03-15', 350000, 35000, '2026 first');
 
 COMMIT;

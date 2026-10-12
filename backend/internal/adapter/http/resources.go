@@ -374,3 +374,108 @@ func deductionResource(svc *usecase.TaxDeductionService) resource[*domain.TaxDed
 		},
 	}
 }
+
+type dividendRequest struct {
+	Source         string       `json:"source"`
+	PaidOn         *string      `json:"paid_on"`
+	Gross          domain.Money `json:"gross"`
+	WithholdingTax domain.Money `json:"withholding_tax"`
+	Note           string       `json:"note"`
+}
+
+type dividendResponse struct {
+	ID             int64        `json:"id"`
+	Source         string       `json:"source"`
+	SourceType     string       `json:"source_type"`
+	SourceID       int64        `json:"source_id"`
+	SourceName     string       `json:"source_name"`
+	PaidOn         *string      `json:"paid_on"`
+	Gross          domain.Money `json:"gross"`
+	WithholdingTax domain.Money `json:"withholding_tax"`
+	Net            domain.Money `json:"net"`
+	Note           string       `json:"note"`
+	timestamps
+}
+
+func dividendResource(svc *usecase.DividendService) resource[*domain.DividendPayment, domain.DividendPayment, domain.YearFilter] {
+	return resource[*domain.DividendPayment, domain.DividendPayment, domain.YearFilter]{
+		svc: svc,
+		decode: decoder(func(r dividendRequest) (*domain.DividendPayment, error) {
+			source, err := domain.ParseDividendSource(r.Source)
+			if err != nil {
+				return nil, err
+			}
+			paidOn, err := parseDate("paid_on", r.PaidOn)
+			if err != nil {
+				return nil, err
+			}
+			d := &domain.DividendPayment{Source: source, Gross: r.Gross, WithholdingTax: r.WithholdingTax, Note: r.Note}
+			if paidOn != nil {
+				d.PaidOn = *paidOn
+			}
+			return d, nil
+		}),
+		filter: yearFilter,
+		present: func(d domain.DividendPayment) any {
+			return dividendResponse{
+				ID: d.ID, Source: d.Source.String(), SourceType: string(d.Source.Type), SourceID: d.Source.ID,
+				SourceName: d.SourceName, PaidOn: formatDate(&d.PaidOn), Gross: d.Gross,
+				WithholdingTax: d.WithholdingTax, Net: d.Net(), Note: d.Note,
+				timestamps: timestamps{d.CreatedAt, d.UpdatedAt},
+			}
+		},
+	}
+}
+
+type dividendSourceResponse struct {
+	Source         string       `json:"source"`
+	SourceType     string       `json:"source_type"`
+	SourceID       int64        `json:"source_id"`
+	SourceName     string       `json:"source_name"`
+	AssetValue     domain.Money `json:"asset_value"`
+	Payments       int          `json:"payments"`
+	Months         []int        `json:"months"`
+	Gross          domain.Money `json:"gross"`
+	WithholdingTax domain.Money `json:"withholding_tax"`
+	Net            domain.Money `json:"net"`
+	YieldPct       *float64     `json:"yield_pct"`
+}
+
+type dividendYearResponse struct {
+	Year           int                      `json:"year"`
+	Sources        []dividendSourceResponse `json:"sources"`
+	Payments       int                      `json:"payments"`
+	Gross          domain.Money             `json:"gross"`
+	WithholdingTax domain.Money             `json:"withholding_tax"`
+	Net            domain.Money             `json:"net"`
+}
+
+// dividendSummary answers GET /dividends/summary?year=YYYY (default: this year).
+func dividendSummary(svc *usecase.DividendSummaryService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		year, err := queryInt[int](c, "year")
+		if err != nil {
+			return err
+		}
+		if year == nil {
+			now := time.Now().Year()
+			year = &now
+		}
+		y, err := svc.Year(c.Context(), *year)
+		if err != nil {
+			return err
+		}
+		resp := dividendYearResponse{
+			Year: y.Year, Sources: make([]dividendSourceResponse, len(y.Sources)),
+			Payments: y.Payments, Gross: y.Gross, WithholdingTax: y.WithholdingTax, Net: y.Net(),
+		}
+		for i, s := range y.Sources {
+			resp.Sources[i] = dividendSourceResponse{
+				Source: s.Source.String(), SourceType: string(s.Source.Type), SourceID: s.Source.ID,
+				SourceName: s.SourceName, AssetValue: s.AssetValue, Payments: s.Payments, Months: s.Months,
+				Gross: s.Gross, WithholdingTax: s.WithholdingTax, Net: s.Net(), YieldPct: s.Yield(),
+			}
+		}
+		return c.JSON(resp)
+	}
+}

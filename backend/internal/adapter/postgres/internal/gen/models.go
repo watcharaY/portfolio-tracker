@@ -30,6 +30,20 @@ type BrokerTransaction struct {
 	UpdatedAt time.Time
 }
 
+type DividendPayment struct {
+	ID               int64
+	BrokerID         *int64
+	FundID           *int64
+	SavingsAccountID *int64
+	InsurerID        *int64
+	PaidOn           time.Time
+	Gross            domain.Money
+	WithholdingTax   domain.Money
+	Note             string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
 type Fund struct {
 	ID          int64
 	Name        string

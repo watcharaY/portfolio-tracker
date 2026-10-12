@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -29,9 +30,29 @@ type expectedUser struct {
 	Password string `json:"password"`
 }
 
+type expectedDividendSource struct {
+	Name           string  `json:"name"`
+	Payments       int     `json:"payments"`
+	Months         []int   `json:"months"`
+	Gross          int64   `json:"gross"`
+	WithholdingTax int64   `json:"withholdingTax"`
+	Net            int64   `json:"net"`
+	YieldPct       float64 `json:"yieldPct"`
+}
+
+type expectedDividendYear struct {
+	Payments       int                               `json:"payments"`
+	Gross          int64                             `json:"gross"`
+	WithholdingTax int64                             `json:"withholdingTax"`
+	Net            int64                             `json:"net"`
+	Sources        map[string]expectedDividendSource `json:"sources"`
+}
+
 type e2eExpected struct {
-	Dashboard json.RawMessage `json:"dashboard"`
-	Users     struct {
+	Dividends2025 expectedDividendYear `json:"dividends2025"`
+	Dividends2026 expectedDividendYear `json:"dividends2026"`
+	Dashboard     json.RawMessage      `json:"dashboard"`
+	Users         struct {
 		ForcedChange expectedUser `json:"forcedChange"`
 		Ready        expectedUser `json:"ready"`
 	} `json:"users"`
@@ -339,6 +360,13 @@ var resourceCases = []resourceCase{
 		field:  "amount", value: 200,
 		invalid: map[string]any{"year": 2030, "item": " ", "amount": 100},
 	},
+	{
+		path: "/dividends", seeded: 22,
+		create: map[string]any{"source": "fund:2", "paid_on": "2026-05-01", "gross": 100, "withholding_tax": 10, "note": ""},
+		update: map[string]any{"source": "savings:3", "paid_on": "2026-05-02", "gross": 200, "withholding_tax": 0, "note": "edited"},
+		field:  "gross", value: 200,
+		invalid: map[string]any{"source": "pvd:1", "paid_on": "2026-05-01", "gross": 100, "withholding_tax": 0, "note": ""},
+	},
 }
 
 func TestAPI_ResourceCRUD(t *testing.T) {
@@ -413,6 +441,9 @@ func TestAPI_Filters(t *testing.T) {
 		"/broker-transactions?broker_id=2": 2,
 		"/insurance-payments?insurer_id=1": 3,
 		"/insurance-payments?insurer_id=3": 0,
+		"/dividends?year=2025":             21,
+		"/dividends?year=2026":             1,
+		"/dividends?year=2031":             0,
 	} {
 		if got := len(c.expect(http.MethodGet, path, nil, http.StatusOK).list(t)); got != n {
 			t.Errorf("GET %s = %d rows, want %d", path, got, n)
@@ -433,4 +464,67 @@ func mustJSON(t *testing.T, v any) []byte {
 func jsonNumber(n int64) string {
 	b, _ := json.Marshal(n)
 	return string(b)
+}
+
+func TestAPI_DividendSummary(t *testing.T) {
+	c, want := newAPI(t)
+	c.login(want.Users.Ready)
+
+	type source struct {
+		Source         string   `json:"source"`
+		SourceName     string   `json:"source_name"`
+		Payments       int      `json:"payments"`
+		Months         []int    `json:"months"`
+		Gross          int64    `json:"gross"`
+		WithholdingTax int64    `json:"withholding_tax"`
+		Net            int64    `json:"net"`
+		YieldPct       *float64 `json:"yield_pct"`
+	}
+	var got struct {
+		Year           int      `json:"year"`
+		Sources        []source `json:"sources"`
+		Payments       int      `json:"payments"`
+		Gross          int64    `json:"gross"`
+		WithholdingTax int64    `json:"withholding_tax"`
+		Net            int64    `json:"net"`
+	}
+	if err := json.Unmarshal(c.expect(http.MethodGet, "/dividends/summary?year=2025", nil, http.StatusOK).body, &got); err != nil {
+		t.Fatal(err)
+	}
+	w := want.Dividends2025
+	if got.Year != 2025 || got.Payments != w.Payments || got.Gross != w.Gross || got.WithholdingTax != w.WithholdingTax || got.Net != w.Net {
+		t.Errorf("2025 totals = %+v, want %+v", got, w)
+	}
+	if len(got.Sources) != len(w.Sources) {
+		t.Fatalf("got %d sources, want %d", len(got.Sources), len(w.Sources))
+	}
+	for _, s := range got.Sources {
+		e, ok := w.Sources[s.Source]
+		if !ok {
+			t.Errorf("unexpected source %s", s.Source)
+			continue
+		}
+		if s.SourceName != e.Name || s.Payments != e.Payments || !slices.Equal(s.Months, e.Months) ||
+			s.Gross != e.Gross || s.WithholdingTax != e.WithholdingTax || s.Net != e.Net ||
+			s.YieldPct == nil || math.Abs(*s.YieldPct-e.YieldPct) > 5e-7 {
+			t.Errorf("%s = %+v (yield %v), want %+v", s.Source, s, s.YieldPct, e)
+		}
+	}
+
+	if err := json.Unmarshal(c.expect(http.MethodGet, "/dividends/summary?year=2026", nil, http.StatusOK).body, &got); err != nil {
+		t.Fatal(err)
+	}
+	if w := want.Dividends2026; got.Payments != w.Payments || got.Net != w.Net {
+		t.Errorf("2026 totals = %+v, want %+v", got, w)
+	}
+	c.expect(http.MethodGet, "/dividends/summary", nil, http.StatusOK)
+	c.expect(http.MethodGet, "/dividends/summary?year=abc", nil, http.StatusBadRequest)
+}
+
+func TestAPI_DividendSourceMustExist(t *testing.T) {
+	c, want := newAPI(t)
+	c.login(want.Users.Ready)
+	c.expect(http.MethodPost, "/dividends", map[string]any{"source": "broker:999", "paid_on": "2026-01-01", "gross": 100}, http.StatusConflict)
+	c.expect(http.MethodPost, "/dividends", map[string]any{"source": "broker:1", "paid_on": "2026-01-01", "gross": 100, "withholding_tax": 200}, http.StatusBadRequest)
+	c.expect(http.MethodPost, "/dividends", map[string]any{"source": "broker:1", "gross": 100}, http.StatusBadRequest)
 }

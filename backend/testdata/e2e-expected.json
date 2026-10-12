@@ -1,17 +1,144 @@
 {
   "dashboard": {
-    "total": { "value": 310020100, "cost": 295100050, "pl": 14920050, "plPct": 0.050559, "allocationPct": 1 },
+    "total": {
+      "value": 310020100,
+      "cost": 295100050,
+      "pl": 14920050,
+      "plPct": 0.050559,
+      "allocationPct": 1
+    },
     "classes": {
-      "stocks":    { "value": 120000000, "cost": 110000000, "pl": 10000000, "plPct": 0.090909, "allocationPct": 0.387072 },
-      "funds":     { "value": 86650050,  "cost": 82000000,  "pl": 4650050,  "plPct": 0.056708, "allocationPct": 0.279498 },
-      "pvd":       { "value": 14670000,  "cost": 14400000,  "pl": 270000,   "plPct": 0.01875,  "allocationPct": 0.04732 },
-      "savings":   { "value": 80000000,  "cost": 80000000,  "pl": 0,        "plPct": 0,        "allocationPct": 0.258048 },
-      "insurance": { "value": 8700050,   "cost": 8700050,   "pl": 0,        "plPct": 0,        "allocationPct": 0.028063 }
+      "stocks": {
+        "value": 120000000,
+        "cost": 110000000,
+        "pl": 10000000,
+        "plPct": 0.090909,
+        "allocationPct": 0.387072
+      },
+      "funds": {
+        "value": 86650050,
+        "cost": 82000000,
+        "pl": 4650050,
+        "plPct": 0.056708,
+        "allocationPct": 0.279498
+      },
+      "pvd": {
+        "value": 14670000,
+        "cost": 14400000,
+        "pl": 270000,
+        "plPct": 0.01875,
+        "allocationPct": 0.04732
+      },
+      "savings": {
+        "value": 80000000,
+        "cost": 80000000,
+        "pl": 0,
+        "plPct": 0,
+        "allocationPct": 0.258048
+      },
+      "insurance": {
+        "value": 8700050,
+        "cost": 8700050,
+        "pl": 0,
+        "plPct": 0,
+        "allocationPct": 0.028063
+      }
     },
     "estSavingsInterestPerYear": 1500000
   },
   "users": {
-    "forcedChange": { "username": "admin", "password": "admin" },
-    "ready": { "username": "e2e", "password": "E2e-Tiger-Mango-42" }
+    "forcedChange": {
+      "username": "admin",
+      "password": "admin"
+    },
+    "ready": {
+      "username": "e2e",
+      "password": "E2e-Tiger-Mango-42"
+    }
+  },
+  "dividends2025": {
+    "payments": 21,
+    "gross": 3900000,
+    "withholdingTax": 332500,
+    "net": 3567500,
+    "sources": {
+      "broker:1": {
+        "name": "Broker Alpha",
+        "payments": 4,
+        "months": [
+          3,
+          6,
+          9,
+          12
+        ],
+        "gross": 1200000,
+        "withholdingTax": 120000,
+        "net": 1080000,
+        "yieldPct": 0.009
+      },
+      "fund:1": {
+        "name": "Fund Equity A",
+        "payments": 2,
+        "months": [
+          4,
+          10
+        ],
+        "gross": 1000000,
+        "withholdingTax": 100000,
+        "net": 900000,
+        "yieldPct": 0.075
+      },
+      "savings:1": {
+        "name": "ธนาคาร ก",
+        "payments": 2,
+        "months": [
+          6,
+          12
+        ],
+        "gross": 750000,
+        "withholdingTax": 112500,
+        "net": 637500,
+        "yieldPct": 0.01275
+      },
+      "savings:2": {
+        "name": "Bank B",
+        "payments": 12,
+        "months": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "gross": 750000,
+        "withholdingTax": 0,
+        "net": 750000,
+        "yieldPct": 0.025
+      },
+      "insurer:1": {
+        "name": "Insurer One",
+        "payments": 1,
+        "months": [
+          11
+        ],
+        "gross": 200000,
+        "withholdingTax": 0,
+        "net": 200000,
+        "yieldPct": 0.026667
+      }
+    }
+  },
+  "dividends2026": {
+    "payments": 1,
+    "gross": 350000,
+    "withholdingTax": 35000,
+    "net": 315000
   }
 }

@@ -47,6 +47,8 @@ type Services struct {
 	InsurancePayments *usecase.InsurancePaymentService
 	Salary            *usecase.SalaryService
 	TaxDeductions     *usecase.TaxDeductionService
+	Dividends         *usecase.DividendService
+	DividendSummary   *usecase.DividendSummaryService
 }
 
 func NewServer(cfg Config, s Services) *fiber.App {
@@ -111,6 +113,9 @@ func NewServer(cfg Config, s Services) *fiber.App {
 	mount(priv, "/insurance-payments", paymentResource(s.InsurancePayments))
 	mount(priv, "/salary-months", salaryResource(s.Salary))
 	mount(priv, "/tax-deductions", deductionResource(s.TaxDeductions))
+	// Before mount, or /dividends/:id would claim "summary".
+	priv.Get("/dividends/summary", dividendSummary(s.DividendSummary))
+	mount(priv, "/dividends", dividendResource(s.Dividends))
 	mountDocs(priv)
 	api.Use(func(fiber.Ctx) error { return fiber.ErrNotFound })
 
