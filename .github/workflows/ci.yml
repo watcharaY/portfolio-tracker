@@ -32,6 +32,7 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       DATABASE_URL: postgres://portfolio:portfolio@localhost:5432/portfolio?sslmode=disable
+      TEST_DATABASE_URL: postgres://portfolio:portfolio@localhost:5432/portfolio?sslmode=disable
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -39,9 +40,9 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
       - run: make vet
-      - run: make test GOTESTFLAGS=-race
       - name: Migrations apply on a fresh database
         run: cd backend && go run ./cmd/server migrate
+      - run: make test GOTESTFLAGS=-race
 
   web:
     name: Frontend (typecheck, build)
