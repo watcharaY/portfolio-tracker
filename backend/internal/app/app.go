@@ -16,6 +16,18 @@ import (
 	"github.com/watcharaY/portfolio-tracker/backend/internal/usecase"
 )
 
+func Migrate(ctx context.Context, cfg config.Config) error {
+	db, err := postgres.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if err := postgres.Migrate(ctx, db); err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
+	return nil
+}
+
 func Run(ctx context.Context, cfg config.Config) error {
 	db, err := postgres.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {

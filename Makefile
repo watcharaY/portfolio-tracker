@@ -1,0 +1,84 @@
+SHELL := bash
+.SHELLFLAGS := -eu -o pipefail -c
+.DEFAULT_GOAL := help
+
+-include .env
+export DATABASE_URL ADDR SESSION_TTL COOKIE_SECURE CORS_ORIGIN
+POSTGRES_USER ?= portfolio
+POSTGRES_DB   ?= portfolio
+
+BIN         := backend/portfolio-tracker$(if $(filter Windows_NT,$(OS)),.exe,)
+GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
+PSQL        := docker compose exec -T db psql -v ON_ERROR_STOP=1 -U $(POSTGRES_USER) -d $(POSTGRES_DB)
+
+.PHONY: help
+help: ## Show this help
+	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: install
+install: ## Install Go modules and npm packages
+	cd backend && go mod download
+	cd web && npm ci
+
+.PHONY: db-up db-down db-migrate db-reset db-psql
+db-up: ## Start PostgreSQL and wait until it is healthy
+	docker compose up -d --wait db
+
+db-down: ## Stop PostgreSQL (data is kept)
+	docker compose stop db
+
+db-migrate: db-up ## Apply pending migrations without starting the server
+	cd backend && go run ./cmd/server migrate
+
+db-reset: db-up ## DELETE ALL DATA, then re-run migrations (asks first; FORCE=1 skips)
+	@if [ "$(FORCE)" != "1" ]; then \
+		read -r -p "Drop every table in '$(POSTGRES_DB)'? This cannot be undone. Type 'yes': " ans; \
+		[ "$$ans" = "yes" ] || { echo "aborted"; exit 1; }; \
+	fi
+	$(PSQL) -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+	$(MAKE) --no-print-directory db-migrate
+	@echo "Database reset. Start the server to seed admin/admin."
+
+db-psql: db-up ## Open a psql shell
+	docker compose exec db psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
+
+.PHONY: dev-api dev-web
+dev-api: db-up ## Run the backend on :8080
+	cd backend && go run ./cmd/server
+
+dev-web: ## Run the Vite dev server on :5173 (proxies /api to :8080)
+	cd web && npm run dev
+
+.PHONY: test vet typecheck lint vulncheck check
+test: ## Run Go tests (CI adds GOTESTFLAGS=-race)
+	cd backend && go test $(GOTESTFLAGS) ./...
+
+vet: ## go vet + gofmt check
+	cd backend && go vet ./...
+	@out=$$(cd backend && gofmt -l .); if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
+
+typecheck: ## TypeScript type check
+	cd web && npm run typecheck
+
+lint: vet typecheck ## All static checks
+
+vulncheck: ## Scan Go (govulncheck) and npm (npm audit) dependencies for known vulnerabilities
+	cd backend && go run $(GOVULNCHECK) ./...
+	cd web && npm audit --audit-level=moderate
+
+check: lint test vulncheck ## Everything CI runs
+
+.PHONY: build-web build run clean
+build-web: ## Build the SPA into backend/internal/platform/webui/dist
+	cd web && npm run build
+
+build: build-web ## Build the single binary with the SPA embedded
+	cd backend && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o $(notdir $(BIN)) ./cmd/server
+	@echo "built $(BIN)"
+
+run: build db-up ## Build and run the production binary
+	./$(BIN)
+
+clean: ## Remove build output
+	rm -f $(BIN)
+	find backend/internal/platform/webui/dist -mindepth 1 ! -name .gitkeep -delete
