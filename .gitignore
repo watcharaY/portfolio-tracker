@@ -2,6 +2,7 @@
 *.sql.gz
 backups/
 /private/
+/.work/
 *.xlsx
 *.xls
 *.csv
