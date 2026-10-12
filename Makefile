@@ -128,6 +128,7 @@ lint: sqlc-check vet typecheck ## All static checks
 vulncheck: ## Scan Go (govulncheck) and npm (npm audit) dependencies for known vulnerabilities
 	cd backend && go run $(GOVULNCHECK) ./...
 	cd web && npm audit --audit-level=moderate
+	cd e2e && npm audit --audit-level=moderate
 
 check: lint test vulncheck ## Everything CI runs
 
@@ -144,6 +145,27 @@ run: build build-web db-up ## Build both and run the binary, serving web/dist to
 
 clean: ## Remove build output
 	rm -rf $(BIN) web/dist
+
+E2E         := docker compose -f e2e/docker-compose.yml
+# Windows drives the installed Edge; elsewhere Playwright downloads Chromium.
+PLAYWRIGHT  := node node_modules/@playwright/test/cli.js
+E2E_CHANNEL ?= $(if $(filter Windows_NT,$(OS)),msedge,)
+export E2E_CHANNEL
+
+.PHONY: e2e e2e-up e2e-ui e2e-down
+e2e-up: ## Build and start the throwaway e2e stack (web :8100, in-memory db :55432)
+	$(E2E) up -d --build --wait
+	cd e2e && npm ci
+	$(if $(E2E_CHANNEL),,cd e2e && $(PLAYWRIGHT) install chromium)
+
+e2e: e2e-up ## Run the Playwright suite on made-up data, then stop the stack
+	status=0; (cd e2e && $(PLAYWRIGHT) test) || status=$$?; $(E2E) down; exit $$status
+
+e2e-ui: e2e-up ## Open Playwright UI mode against the e2e stack (stop it with e2e-down)
+	cd e2e && $(PLAYWRIGHT) test --ui
+
+e2e-down: ## Stop the e2e stack and drop its data
+	$(E2E) down
 
 DEPLOY := docker compose -f deploy/docker-compose.yml
 

@@ -1,0 +1,35 @@
+# Throwaway stack for the Playwright suite: its own project, ports and an in-memory
+# database, so it never touches the dev database. Started by `make e2e`.
+name: portfolio-tracker-e2e
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: portfolio
+      POSTGRES_PASSWORD: portfolio
+      POSTGRES_DB: portfolio_e2e
+    tmpfs:
+      - /var/lib/postgresql
+    ports:
+      - "127.0.0.1:${E2E_DB_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portfolio -d portfolio_e2e"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ../backend
+    environment:
+      DATABASE_URL: postgres://portfolio:portfolio@db:5432/portfolio_e2e?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ../web
+    ports:
+      - "127.0.0.1:${E2E_PORT:-8100}:80"
+    depends_on:
+      - api
