@@ -46,7 +46,8 @@ portfolio-tracker/
 │     ├─ adapter/
 │     │  ├─ http/                  # Fiber router, DTOs, cookies, error mapping
 │     │  └─ postgres/              # repositories, migrate (schema_migrations)
-│     │     └─ migrations/001_init.sql
+│     │     ├─ migrations/20261012000000_init.sql
+│     │     ├─ queries/*.sql  # sqlc → internal/gen
 │     ├─ platform/                 # config, security (bcrypt, tokens), webui (go:embed)
 │     └─ app/                      # composition root
 ├─ .github/                        # CI workflow, dependabot
