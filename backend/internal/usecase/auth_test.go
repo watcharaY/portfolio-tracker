@@ -187,7 +187,7 @@ func TestChangePassword_RevokesOtherSessions(t *testing.T) {
 	phone := e.login(t, "admin", "admin")
 
 	if _, err := e.svc.ChangePassword(ctx, usecase.ChangePasswordInput{
-		UserID: 1, CurrentPassword: "wrong", NewPassword: "new-password-1", CurrentToken: laptop.Token,
+		UserID: 1, CurrentPassword: "wrong", NewPassword: "New-Mango-42-Rain", CurrentToken: laptop.Token,
 	}); err == nil {
 		t.Fatal("wrong current password must fail")
 	}
@@ -199,7 +199,7 @@ func TestChangePassword_RevokesOtherSessions(t *testing.T) {
 	}
 
 	u, err := e.svc.ChangePassword(ctx, usecase.ChangePasswordInput{
-		UserID: 1, CurrentPassword: "admin", NewPassword: "new-password-1", CurrentToken: laptop.Token,
+		UserID: 1, CurrentPassword: "admin", NewPassword: "New-Mango-42-Rain", CurrentToken: laptop.Token,
 	})
 	if err != nil || u.MustChangePassword {
 		t.Fatalf("change password: %+v %v", u, err)
@@ -210,5 +210,5 @@ func TestChangePassword_RevokesOtherSessions(t *testing.T) {
 	if _, err := e.svc.Authenticate(ctx, phone.Token); !errors.Is(err, domain.ErrUnauthenticated) {
 		t.Errorf("other sessions must be revoked, got %v", err)
 	}
-	e.login(t, "admin", "new-password-1")
+	e.login(t, "admin", "New-Mango-42-Rain")
 }

@@ -34,6 +34,27 @@ test('sign in lands on the overview, log out returns to login', async ({ page })
   await expect(page).toHaveURL(/\/login$/)
 })
 
+test('the password checklist ticks as you type and the server refuses leaked passwords', async ({ page }) => {
+  await login(page, forcedChange.username, forcedChange.password)
+  await expect(page).toHaveURL(/\/change-password$/)
+  const rules = page.getByRole('list', { name: 'Password rules' })
+  const save = page.getByRole('button', { name: 'Save password' })
+
+  await page.getByLabel('Current password').fill(forcedChange.password)
+  await page.getByLabel(/^New password/).fill('short')
+  await expect(rules.locator('li.ok')).toHaveText([/ตัวพิมพ์เล็ก/])
+  await expect(save).toBeDisabled()
+
+  const leaked = 'P@ssw0rd2026!'
+  await page.getByLabel(/^New password/).fill(leaked)
+  await expect(rules.locator('li.ok')).toHaveCount(5)
+  await page.getByLabel('Confirm new password').fill(leaked)
+  await expect(save).toBeEnabled()
+  await save.click()
+  await expect(page.locator('.error')).toContainText('too common')
+  await expect(page).toHaveURL(/\/change-password$/)
+})
+
 test('the seeded admin must change the default password before using the app', async ({ page }) => {
   await login(page, forcedChange.username, forcedChange.password)
   await expect(page).toHaveURL(/\/change-password$/)
